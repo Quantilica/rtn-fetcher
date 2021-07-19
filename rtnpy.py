@@ -3,9 +3,11 @@ import csv
 import datetime
 import pathlib
 import re
-from typing import Union
+from typing import Union, Any
 
 import openpyxl
+
+Table = list[list[Any]]
 
 sheets = [
     "1.1",
@@ -24,15 +26,13 @@ sheets = [
 ]
 
 
-def get_rows(sh, skip=0, nrows=1_048_576):
+def get_rows(sh, min_row=0, max_row=1_048_576) -> Table:
     rows = []
-    for row in sh.iter_rows(min_row=1 + skip, max_row=nrows):
+    for row in sh.iter_rows(min_row=min_row, max_row=max_row):
         if row[0].value:
             row = [cell for cell in row if cell.value is not None]
             if len(row) < 3:
                 continue
-            if isinstance(row[0].value, str) and row[0].value.startswith("Memorando:"):
-                break
             rows.append(row)
     return rows
 
@@ -45,7 +45,7 @@ def get_indent(cell):
     return cell.alignment.indent
 
 
-def transpose(data):
+def transpose(data) -> Table:
     return list(zip(*data))
 
 
@@ -56,11 +56,15 @@ def clean_name(name):
     return name
 
 
-def melt(data, id_cols: list[str], var_name="variable", value_name="value", get_value=True):
-    columns: list = data[0]
+def melt(data: list[list[Any]],
+         id_cols: list[str],
+         var_name="variable",
+         value_name="value",
+         get_value=True) -> Table:
+    columns = data[0]
     index_id_cols = [columns.index(id_col) for id_col in id_cols]
     header = [*id_cols, var_name, value_name]
-    yield header
+    new_data = [header]
     for row in data[1:]:
         id_values = [row[i] for i in index_id_cols]
         for i, cell in enumerate(row):
@@ -70,7 +74,8 @@ def melt(data, id_cols: list[str], var_name="variable", value_name="value", get_
                 output_row = id_values + [columns[i].value, cell.value]
             else:
                 output_row = id_values + [columns[i], cell]
-            yield output_row
+            new_data.append(output_row)
+    return new_data
 
 
 def parse_column_name(name):
@@ -82,19 +87,21 @@ def parse_column_name(name):
     if match:
         account_code = match.group().strip()
     account_name = clean_name(name.replace(account_code, ""))
+    account_code = account_code.replace(".", "=>")
 
     return account_code, account_name
 
 
 def account_code_to_list_ints(account_code):
-    return [int(code) for code in account_code.split(".") if code]
+    return [int(code) for code in account_code.split("=>") if code]
 
 
 def list_ints_to_account_code(account_code):
-    return ".".join([str(code) for code in account_code])
+    return "=>".join([str(code) for code in account_code])
 
 
 def process_accounts(accounts):
+    accounts_data = []
     last_indent = 0
     last_account_code = account_code_root = []
     counter = 1
@@ -115,28 +122,63 @@ def process_accounts(accounts):
             counter += 1
         last_account_code = account_code
         last_indent = indent
-        yield (list_ints_to_account_code(account_code), account_name)
+        accounts_data.append(
+            [
+                list_ints_to_account_code(account_code),
+                account_name,
+            ],
+        )
+    return accounts_data
 
 
-def insert_account_data(data):
+def expand_account_hierarchy(accounts_data) -> Table:
+    maxlevel = max(map(lambda t: len(t[0].split("=>")), accounts_data))
+    path = [f"P_{i}" for i in range(1, maxlevel+1)]
+    account_hierarchy = [["account_code", "account_name"] + path]
+    last_row = (maxlevel+1) * [None]
+    for account_code, name in accounts_data:
+        list_int_account_code = account_code.split("=>")
+        level = len(list_int_account_code)
+        full_account_name = ".".join(list_int_account_code) + " " + name
+        row = [account_code, full_account_name] + last_row[:level-1] + [name] + ((maxlevel-level) * [None])
+        account_hierarchy.append(row)
+        last_row = row[2:]
+    return account_hierarchy
+
+
+def insert_accounts_data(data, accounts_data) -> Table:
     new_data = [["account_name", "account_code", *data[0][2:]]]
-    accounts = get_accounts_column(data)
-    accounts_data = process_accounts(accounts)
     for row, (account_code, account_name) in zip(data[1:], accounts_data):
         new_data.append([account_name, account_code, *row[2:]])
     return new_data
 
 
-def multiply_column(data, column_name, by_value: Union[int, float] = 1_000_000):
+def insert_account_hierarchy(data, account_hierarchy) -> Table:
+    new_data = [account_hierarchy[0] + data[0][1:]]
+    for row, accounts in zip(data[1:], account_hierarchy[1:]):
+        new_data.append(accounts + row[1:])
+    return new_data
+
+
+def insert_account_codes(data, account_hierarchy) -> Table:
+    new_data = [["account_code"] + data[0][1:]]
+    for row, accounts in zip(data[1:], account_hierarchy[1:]):
+        account_code = [accounts[0]]
+        original_row = row[1:]
+        new_data.append(account_code + original_row)
+    return new_data
+
+
+def value_column_to_int(data, value_column_name, by_value: Union[int, float] = 1_000_000) -> Table:
     new_data = [data[0]]
-    index = data[0].index(column_name)
+    index = data[0].index(value_column_name)
     for row in data[1:]:
         row[index] = int(row[index] * by_value)
         new_data.append(row)
     return new_data
 
 
-def split_datetime_column(data, datetime_column_name):
+def split_datetime_column(data, datetime_column_name) -> Table:
     header: list = data[0]
     index = header.index(datetime_column_name)
     header[index] = "year"
@@ -156,7 +198,41 @@ def openwb(filepath):
     return wb
 
 
-def write_tsv(data, filepath):
+def read_1_1(wb) -> tuple[Table]:
+    sh = wb["1.1"]
+    data = list(get_rows(sh, 5, 73))
+    accounts = get_accounts_column(data)
+    accounts_data = process_accounts(accounts)
+    account_hierarchy = expand_account_hierarchy(accounts_data)
+    data = insert_account_codes(data, account_hierarchy)
+    data = melt(
+        data,
+        id_cols=["account_code"],
+        var_name="date",
+    )
+    data = value_column_to_int(data, value_column_name="value")
+    data = split_datetime_column(data, datetime_column_name="date")
+    return data, account_hierarchy
+
+
+def read_1_2(wb) -> tuple[Table]:
+    sh = wb["1.2"]
+    data = list(get_rows(sh, 5, 162))
+    accounts = get_accounts_column(data)
+    accounts_data = process_accounts(accounts)
+    account_hierarchy = expand_account_hierarchy(accounts_data)
+    data = insert_account_codes(data, account_hierarchy)
+    data = melt(
+        data,
+        id_cols=["account_code"],
+        var_name="date",
+    )
+    data = value_column_to_int(data, value_column_name="value")
+    data = split_datetime_column(data, datetime_column_name="date")
+    return data, account_hierarchy
+
+
+def write_csv(data, filepath):
     with open(filepath, "w", encoding="utf-8", newline="\n") as f:
-        writer = csv.writer(f, delimiter="\t", dialect=csv.QUOTE_ALL)
+        writer = csv.writer(f, delimiter=",", dialect=csv.QUOTE_ALL)
         writer.writerows(data)
