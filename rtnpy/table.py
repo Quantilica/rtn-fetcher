@@ -4,6 +4,33 @@ from typing import Any, Callable
 Table = list[list[Any]]
 
 
+class Tbl:
+
+    data: list[list[Any]]
+
+    def __init__(self, data=None) -> None:
+        if data:
+            self.data = data
+
+    def transpose(self):
+        pass
+
+    def melt(self):
+        pass
+
+    def apply(self):
+        pass
+
+    def insert(self):
+        pass
+
+    def select(self):
+        pass
+
+    def where(self):
+        pass
+
+
 def transpose(data: Table) -> Table:
     return list(zip(*data))
 
@@ -26,21 +53,6 @@ def melt(data: Table,
     return new_data
 
 
-def split_datetime_column(data: Table, datetime_column_name: str) -> Table:
-    header: list = data[0]
-    index = header.index(datetime_column_name)
-    header[index] = "year"
-    header.insert(index + 1, "month")
-    new_data = [header]
-    for row in data[1:]:
-        year = row[index].year
-        month = row[index].month
-        row[index] = year
-        row.insert(index + 1, month)
-        new_data.append(row)
-    return new_data
-
-
 def apply(data: Table, column_name: str, func: Callable) -> Table:
     new_data = [data[0]]
     index = data[0].index(column_name)
@@ -50,11 +62,10 @@ def apply(data: Table, column_name: str, func: Callable) -> Table:
     return new_data
 
 
-def insert(data1: Table, data2: Table, index: int = -1) -> Table:
-    header = data1[0] + data2[0]
-    new_data = [header]
+def insert(data1: Table, data2: Table, index: int = 0) -> Table:
+    new_data = [data1[:index] + data2 + data1[index:]]
     for row1, row2 in zip(data1[1:], data2[1:]):
-        new_data.append(row1 + row2)
+        new_data.append(row1[:index] + row2 + row1[index:])
     return new_data
 
 
@@ -67,9 +78,17 @@ def select(data: Table, *columns: str) -> Table:
     return new_data
 
 
-def f(func: Callable, data: Table) -> Table:
+def where(func: Callable, data: Table) -> Table:
     new_data = [data[0]]
     for row in data[1:]:
         if func(row):
             new_data.append(row)
+    return new_data
+
+
+def assign(data: Table, index: int, values: list[Any]) -> Table:
+    new_data = []
+    for row, new_value in zip(data, values):
+        row[index] = new_value
+        new_data.append(row)
     return new_data

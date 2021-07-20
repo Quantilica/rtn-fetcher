@@ -8,7 +8,7 @@ from .account import (account_code_to_list_ints, expand_account_hierarchy,
                       parse_column_name)
 from .excel import Cell, get_indent, openwb
 from .extract import get_accounts_data, get_rows
-from .table import Table, apply, melt, split_datetime_column, transpose
+from .table import Table, apply, assign, insert, melt, select, transpose, where
 
 sheets = [
     "1.1",
@@ -28,16 +28,13 @@ sheets = [
 
 
 def insert_accounts_data(data, accounts_data) -> Table:
-    new_data = [["account_name", "account_code", *data[0][2:]]]
-    for row, (account_code, account_name) in zip(data[1:], accounts_data):
-        new_data.append([account_name, account_code, *row[2:]])
+    accounts_data = [["account_name", "account_code"]] + accounts_data
+    new_data = insert(data, accounts_data)
     return new_data
 
 
 def insert_account_hierarchy(data, account_hierarchy) -> Table:
-    new_data = [account_hierarchy[0] + data[0][1:]]
-    for row, accounts in zip(data[1:], account_hierarchy[1:]):
-        new_data.append(accounts + row[1:])
+    new_data = insert(data, account_hierarchy)
     return new_data
 
 
@@ -50,14 +47,28 @@ def insert_account_codes(data: Table, account_hierarchy: Table) -> Table:
     return new_data
 
 
+def split_datetime_column(data: Table, datetime_column_name: str) -> Table:
+    header: list = data[0]
+    index = header.index(datetime_column_name)
+    header[index] = "year"
+    header.insert(index + 1, "month")
+    new_data = [header]
+    for row in data[1:]:
+        year = row[index].year
+        month = row[index].month
+        row[index] = year
+        row.insert(index + 1, month)
+        new_data.append(row)
+    return new_data
+
+
 def value_column_to_int(data: Table, value_column_name: str,
                         by_value: Union[int, float] = 1_000_000) -> Table:
-    new_data = apply(
+    return apply(
         data=data,
         column_name=value_column_name,
-        func=lambda x: x.value * by_value,
+        func=lambda x: int(x.value * by_value),
     )
-    return new_data
 
 
 def read_1_1(wb) -> tuple[Table]:

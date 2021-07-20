@@ -45,7 +45,12 @@ def expand_account_hierarchy(accounts_data) -> Table:
         list_int_account_code = account_code.split("=>")
         level = len(list_int_account_code)
         full_account_name = ".".join(list_int_account_code) + " " + name
-        row = [account_code, full_account_name] + last_row[:level-1] + [name] + ((maxlevel-level) * [None])
+        row = (
+            [account_code, full_account_name]
+            + last_row[:level-1]
+            + [name]
+            + ((maxlevel-level) * [None])  # Fill with None
+        )
         account_hierarchy.append(row)
         last_row = row[2:]
     return account_hierarchy
