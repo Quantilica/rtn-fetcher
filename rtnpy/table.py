@@ -1,4 +1,3 @@
-
 from typing import Any, Callable
 
 Column = list[Any]
@@ -8,28 +7,17 @@ Table = list[Column]
 class Tbl:
 
     data: list[list[Any]]
+    ncols: int
+    nrows: int
 
     def __init__(self, data=None) -> None:
         if data:
             self.data = data
+            self.ncols = len(data)
+            self.nrows = len(data[0])
 
-    def transpose(self):
-        pass
-
-    def melt(self):
-        pass
-
-    def apply(self):
-        pass
-
-    def insert(self):
-        pass
-
-    def select(self):
-        pass
-
-    def where(self):
-        pass
+    def get_header(self):
+        return get_header(self.data)
 
 
 def get_header(data: Table):
@@ -69,7 +57,7 @@ def apply(data: Table, column_name: str, func: Callable) -> Table:
     header = get_header(data)
     index = header.index(column_name)
     new_data = data.copy()
-    new_data[index] = [new_data[index][0]] + [func(value) for value in new_data[index][1:]]
+    new_data[index] = [column_name] + [func(v) for v in new_data[index][1:]]
     return new_data
 
 
