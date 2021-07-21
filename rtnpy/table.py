@@ -74,7 +74,12 @@ def select(data: Table, *columns: str) -> Table:
 
 
 def where(func: Callable, data: Table) -> Table:
-    pass
+    new_data = []
+    for row in iter_rows(transpose(data)):
+        if func(row):
+            new_data.append(row)
+    new_data = transpose(new_data)
+    return new_data
 
 
 def assign(data: Table, column: Column) -> Table:
