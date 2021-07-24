@@ -1,10 +1,10 @@
 from .account import (account_code_to_list_ints, list_ints_to_account_code,
                       parse_column_name)
 from .excel import Cell, Sheet, get_indent
-from .table import Table
+from .table import Matrix, Tbl
 
 
-def get_rows(sh: Sheet, min_row: int = 0, max_row: int = 1_048_576) -> Table:
+def get_rows(sh: Sheet, min_row: int = 0, max_row: int = 1_048_576) -> Matrix:
     rows = []
     for row in sh.iter_rows(min_row=min_row, max_row=max_row):
         if row[0].value:
@@ -15,8 +15,8 @@ def get_rows(sh: Sheet, min_row: int = 0, max_row: int = 1_048_576) -> Table:
     return rows
 
 
-def get_accounts_data(accounts: list[Cell]) -> list[list[str]]:
-    accounts_data = []
+def get_accounts_data(accounts: list[Cell]) -> Tbl:
+    accounts_data = [["account_code"], ["account_name"]]
     last_indent = 0
     last_account_code = account_code_root = []
     counter = 1
@@ -37,10 +37,7 @@ def get_accounts_data(accounts: list[Cell]) -> list[list[str]]:
             counter += 1
         last_account_code = account_code
         last_indent = indent
-        accounts_data.append(
-            [
-                list_ints_to_account_code(account_code),
-                account_name,
-            ],
-        )
+        accounts_data[0].append(list_ints_to_account_code(account_code))
+        accounts_data[1].append(account_name)
+    accounts_data = Tbl(accounts_data)
     return accounts_data

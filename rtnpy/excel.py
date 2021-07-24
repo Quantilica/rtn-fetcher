@@ -16,3 +16,7 @@ def openwb(filepath: Filepath) -> Workbook:
 
 def get_indent(cell: Cell) -> float:
     return cell.alignment.indent
+
+
+def to_value(cell):
+    return cell.value if isinstance(cell, Cell) else cell

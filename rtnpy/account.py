@@ -1,10 +1,10 @@
 import re
 
-from .table import Table
+from .table import Matrix, Tbl, iter_rows, transpose
 
 
-def get_accounts_column(data: Table):
-    return [row[0] for row in data[1:]]
+def get_accounts_column(data: Tbl):
+    return [col[0] for col in data.data[1:]]
 
 
 def account_code_to_list_ints(account_code: str) -> list[int]:
@@ -36,15 +36,18 @@ def parse_column_name(name):
     return account_code, account_name
 
 
-def expand_account_hierarchy(accounts_data) -> Table:
-    maxlevel = max(map(lambda t: len(t[0].split("=>")), accounts_data))
-    path = [f"P_{i}" for i in range(1, maxlevel+1)]
-    account_hierarchy = [["account_code", "account_name"] + path]
+def expand_account_hierarchy(accounts_data: Tbl) -> Tbl:
+    account_code_col = accounts_data.data[0]
+    maxlevel = max(map(lambda t: len(t.split("=>")), account_code_col[1:]))
+    part_levels = [f"P_{i}" for i in range(1, maxlevel+1)]
+    account_hierarchy = [["account_code", "account_name"] + part_levels]
     last_row = (maxlevel+1) * [None]
-    for account_code, name in accounts_data:
-        list_int_account_code = account_code.split("=>")
-        level = len(list_int_account_code)
-        full_account_name = ".".join(list_int_account_code) + " " + name
+    it = accounts_data.iter_rows()
+    next(it)
+    for account_code, name in it:
+        list_account_code = account_code.split("=>")
+        level = len(list_account_code)
+        full_account_name = ".".join(list_account_code) + " " + name
         row = (
             [account_code, full_account_name]
             + last_row[:level-1]
@@ -53,4 +56,5 @@ def expand_account_hierarchy(accounts_data) -> Table:
         )
         account_hierarchy.append(row)
         last_row = row[2:]
+    account_hierarchy = Tbl(transpose(account_hierarchy))
     return account_hierarchy
