@@ -4,9 +4,7 @@ import os
 import pathlib
 from typing import Union
 
-from .account import (account_code_to_list_ints, expand_account_hierarchy,
-                      get_accounts_column, list_ints_to_account_code,
-                      parse_column_name)
+from .account import expand_account_hierarchy, get_accounts_column
 from .excel import Cell, get_indent, openwb, to_value
 from .extract import get_accounts_data, get_rows
 from .table import (Column, Matrix, Tbl, apply, assign, drop_rows, get_header,
@@ -64,30 +62,9 @@ def value_column_to_int(column: list[float],
     )
 
 
-def read_1_1(wb) -> tuple[Tbl]:
-    sh = wb["1.1"]
-    data = Tbl(get_rows(sh, 5, 73))
-    data = data.drop_cols([1])
-    data.data[0][0] = "date"
-    accounts_data = get_accounts_data(get_accounts_column(data))
-    account_hierarchy = expand_account_hierarchy(accounts_data)
-    data = tbl_values(data)
-    data = insert_account_codes(data, account_hierarchy)
-    data = data.melt(
-        id_cols=["date"],
-        var_name="account_code",
-    )
-    data = data.assign(
-        value=apply(data["value"][1:], lambda x: int(1_000_000 * x)),
-    )
-    data = split_datetime_column(data, "date")
-    return data, account_hierarchy
-
-
 def read_1_2(wb) -> tuple[Tbl]:
     sh = wb["1.2"]
     data = Tbl(get_rows(sh, 5, 162))
-    data = data.drop_cols([1])
     data.data[0][0] = "date"
     accounts_data = get_accounts_data(get_accounts_column(data))
     account_hierarchy = expand_account_hierarchy(accounts_data)
@@ -125,7 +102,22 @@ def read_1_3(wb) -> tuple[Tbl]:
 
 
 def read_1_6(wb) -> tuple[Tbl]:
-    pass
+    sh = wb["1.6"]
+    data = Tbl(get_rows(sh, 5, 24))
+    data.data[0][0] = "date"
+    accounts_data = get_accounts_data(get_accounts_column(data))
+    account_hierarchy = expand_account_hierarchy(accounts_data)
+    data = tbl_values(data)
+    data = insert_account_codes(data, account_hierarchy)
+    data = data.melt(
+        id_cols=["date"],
+        var_name="account_code",
+    )
+    data = data.assign(
+        value=apply(data["value"][1:], lambda x: int(1_000_000 * x)),
+    )
+    data = split_datetime_column(data, "date")
+    return data, account_hierarchy
 
 
 def write_csv(data: Tbl, filepath):
