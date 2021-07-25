@@ -67,9 +67,6 @@ def _read(sh: Sheet, rows: Sequence[int], drop_cols: Sequence[int] = (),
         id_cols=["date"],
         var_name="account_code",
     )
-    data = data.assign(
-        value=apply(data["value"][1:], lambda x: int(1_000_000 * x)),
-    )
     if period == "monthly":
         data = split_datetime_column(data, "date")
     elif period == "yearly":
@@ -79,19 +76,37 @@ def _read(sh: Sheet, rows: Sequence[int], drop_cols: Sequence[int] = (),
 
 def read_1_2(wb) -> tuple[Tbl]:
     sh = wb["1.2"]
-    data, account_hierarchy = _read(sh, rows=(5, 162), drop_cols=[1], period="monthly")
+    data, account_hierarchy = _read(sh, rows=(5, 162), period="monthly")
+    data = data.assign(
+        value=apply(data["value"][1:], lambda x: int(1_000_000 * x)),
+    )
     return data, account_hierarchy
 
 
 def read_1_3(wb) -> tuple[Tbl]:
     sh = wb["1.3"]
     data, account_hierarchy = _read(sh, rows=(5, 65), drop_cols=[1], period="monthly")
+    data = data.assign(
+        value=apply(data["value"][1:], lambda x: int(1_000_000 * x)),
+    )
     return data, account_hierarchy
 
 
 def read_1_6(wb) -> tuple[Tbl]:
     sh = wb["1.6"]
     data, account_hierarchy = _read(sh, rows=(5, 24), period="monthly")
+    data = data.assign(
+        value=apply(data["value"][1:], lambda x: int(1_000_000 * x)),
+    )
+    return data, account_hierarchy
+
+
+def read_2_2_a(wb) -> tuple[Tbl]:
+    sh = wb["2.2-A"]
+    data, account_hierarchy = _read(sh, rows=(5, 162), period="yearly")
+    data = data.assign(
+        value=apply(data["value"][1:], lambda x: int(1_000_000 * x)),
+    )
     return data, account_hierarchy
 
 

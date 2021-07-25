@@ -1,5 +1,3 @@
-
-from itertools import islice
 from typing import Any, Callable
 
 Column = list[Any]
