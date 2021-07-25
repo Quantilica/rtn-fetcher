@@ -36,7 +36,8 @@ class Tbl:
     def insert(self, data: "Tbl", index: int = 0) -> "Tbl":
         return Tbl(insert(self.data, data.data, index))
 
-    def melt(self, id_cols: list[str], var_name="variable", value_name="value") -> "Tbl":
+    def melt(self, id_cols: list[str], var_name: str = "variable",
+             value_name: str= "value") -> "Tbl":
         return Tbl(melt(self.data, id_cols, var_name, value_name))
 
     def drop_rows(self, rows: list[int]) -> "Tbl":
@@ -44,6 +45,9 @@ class Tbl:
 
     def drop_cols(self, cols: list[int]) -> "Tbl":
         return Tbl(drop_cols(self.data, cols))
+
+    def rename(self, **names_to: str) -> "Tbl":
+        return Tbl(rename(self.data, **names_to))
 
     def __getitem__(self, name: str) -> Column:
         header = get_header(self.data)
@@ -68,11 +72,11 @@ class Tbl:
         return s
 
 
-def get_header(data: Matrix):
+def get_header(data: Matrix) -> list:
     return [col[0] for col in data]
 
 
-def iter_rows(data: Matrix):
+def iter_rows(data: Matrix) -> list:
     for row in zip(*data):
         yield list(row)
 
@@ -83,8 +87,8 @@ def transpose(data: Matrix) -> Matrix:
 
 def melt(data: Matrix,
          id_cols: list[str],
-         var_name="variable",
-         value_name="value") -> Matrix:
+         var_name: str= "variable",
+         value_name: str= "value") -> Matrix:
     data = transpose(data.copy())
     columns = data[0]
     index_id_cols = [columns.index(id_col) for id_col in id_cols]
@@ -156,4 +160,13 @@ def drop_cols(data: Matrix, cols: list[int]) -> Matrix:
         if i in cols:
             continue
         new_data.append(col)
+    return new_data
+
+
+def rename(data: Matrix, **names_to: str) -> Matrix:
+    new_data = data.copy()
+    for i in range(len(new_data)):
+        original = new_data[i][0]
+        if original in names_to:
+            new_data[i][0] = names_to[original]
     return new_data

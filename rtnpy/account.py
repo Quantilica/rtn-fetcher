@@ -7,14 +7,14 @@ def get_accounts_column(data: Tbl):
     return [col[0] for col in data.data[1:]]
 
 
-def clean_name(name):
+def clean_name(name: str) -> str:
     name = re.sub(r" +", " ", name)
     name = re.sub(r" \d+/$", "", name)
     name = name.strip(" -")
     return name
 
 
-def parse_column_name(name):
+def parse_column_name(name: str) -> tuple[str]:
 
     # Initialize variables
     account_code = account_name = ""
@@ -32,7 +32,9 @@ def expand_account_hierarchy(accounts_data: Tbl) -> Tbl:
     account_code_col = accounts_data["account_code"][1:]
     maxlevel = max(map(lambda t: len(t.split("=>")), account_code_col))
     part_levels = [f"P_{i}" for i in range(1, maxlevel+1)]
-    account_hierarchy = [["account_code", "account_name", "account_level"] + part_levels]
+    account_hierarchy = [
+        ["account_code", "account_name", "account_level"] + part_levels
+    ]
     last_row = (maxlevel+1) * [None]
     it = accounts_data.iter_rows()
     next(it)

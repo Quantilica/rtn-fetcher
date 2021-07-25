@@ -1,5 +1,5 @@
 import os
-from typing import Union
+from typing import Any, Union
 import pathlib
 import openpyxl
 
@@ -18,5 +18,5 @@ def get_indent(cell: Cell) -> float:
     return cell.alignment.indent
 
 
-def to_value(cell):
+def to_value(cell: Cell) -> Any:
     return cell.value if isinstance(cell, Cell) else cell

@@ -2,13 +2,12 @@
 import csv
 import os
 import pathlib
-from typing import Union
+from typing import Sequence, Union
 
 from .account import expand_account_hierarchy, get_accounts_column
-from .excel import Cell, get_indent, openwb, to_value
+from .excel import Sheet, openwb, to_value
 from .extract import get_accounts_data, get_rows
-from .table import (Column, Matrix, Tbl, apply, assign, drop_rows, get_header,
-                    insert, iter_rows, melt, select, transpose, where)
+from .table import Tbl, apply, get_header
 
 Filepath = Union[pathlib.Path, str, os.PathLike]
 
@@ -54,17 +53,11 @@ def split_datetime_column(data: Tbl, datetime_column_name: str) -> Tbl:
     return new_data
 
 
-def value_column_to_int(column: list[float],
-                        by_value: Union[int, float] = 1_000_000) -> Column:
-    return apply(
-        column=column,
-        func=lambda x: int(x * by_value),
-    )
-
-
-def read_1_2(wb) -> tuple[Tbl]:
-    sh = wb["1.2"]
-    data = Tbl(get_rows(sh, 5, 162))
+def _read(sh: Sheet, rows: Sequence[int], drop_cols: Sequence[int] = (),
+          period: str = "monthly") -> tuple[Tbl]:
+    data = Tbl(get_rows(sh, *rows))
+    if drop_cols:
+        data = data.drop_cols(drop_cols)
     data.data[0][0] = "date"
     accounts_data = get_accounts_data(get_accounts_column(data))
     account_hierarchy = expand_account_hierarchy(accounts_data)
@@ -77,46 +70,28 @@ def read_1_2(wb) -> tuple[Tbl]:
     data = data.assign(
         value=apply(data["value"][1:], lambda x: int(1_000_000 * x)),
     )
-    data = split_datetime_column(data, "date")
+    if period == "monthly":
+        data = split_datetime_column(data, "date")
+    elif period == "yearly":
+        data = data.rename(date="year")
+    return data, account_hierarchy
+
+
+def read_1_2(wb) -> tuple[Tbl]:
+    sh = wb["1.2"]
+    data, account_hierarchy = _read(sh, rows=(5, 162), drop_cols=[1], period="monthly")
     return data, account_hierarchy
 
 
 def read_1_3(wb) -> tuple[Tbl]:
     sh = wb["1.3"]
-    data = Tbl(get_rows(sh, 5, 65))
-    data = data.drop_cols([1])
-    data.data[0][0] = "date"
-    accounts_data = get_accounts_data(get_accounts_column(data))
-    account_hierarchy = expand_account_hierarchy(accounts_data)
-    data = tbl_values(data)
-    data = insert_account_codes(data, account_hierarchy)
-    data = data.melt(
-        id_cols=["date"],
-        var_name="account_code",
-    )
-    data = data.assign(
-        value=apply(data["value"][1:], lambda x: int(1_000_000 * x)),
-    )
-    data = split_datetime_column(data, "date")
+    data, account_hierarchy = _read(sh, rows=(5, 65), drop_cols=[1], period="monthly")
     return data, account_hierarchy
 
 
 def read_1_6(wb) -> tuple[Tbl]:
     sh = wb["1.6"]
-    data = Tbl(get_rows(sh, 5, 24))
-    data.data[0][0] = "date"
-    accounts_data = get_accounts_data(get_accounts_column(data))
-    account_hierarchy = expand_account_hierarchy(accounts_data)
-    data = tbl_values(data)
-    data = insert_account_codes(data, account_hierarchy)
-    data = data.melt(
-        id_cols=["date"],
-        var_name="account_code",
-    )
-    data = data.assign(
-        value=apply(data["value"][1:], lambda x: int(1_000_000 * x)),
-    )
-    data = split_datetime_column(data, "date")
+    data, account_hierarchy = _read(sh, rows=(5, 24), period="monthly")
     return data, account_hierarchy
 
 
