@@ -1,6 +1,7 @@
-__pycache__
-Pipfile.lock
-*.csv
-*.tsv
-*.xls
-*.xlsx
+__pycache__/
+build/
+dist/
+*.egg-info
+
+# Poetry
+poetry.lock
