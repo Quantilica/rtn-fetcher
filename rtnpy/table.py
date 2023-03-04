@@ -83,10 +83,12 @@ def transpose(data: Matrix) -> Matrix:
     return [[*row] for row in zip(*data)]
 
 
-def melt(data: Matrix,
-         id_cols: list[str],
-         var_name: str= "variable",
-         value_name: str= "value") -> Matrix:
+def melt(
+    data: Matrix,
+    id_cols: list[str],
+    var_name: str = "variable",
+    value_name: str = "value",
+) -> Matrix:
     data = transpose(data.copy())
     columns = data[0]
     index_id_cols = [columns.index(id_col) for id_col in id_cols]

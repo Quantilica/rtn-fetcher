@@ -1,15 +1,13 @@
-import os
-from typing import Any, Union
-import pathlib
+from typing import Any
+from pathlib import Path
 import openpyxl
 
-Filepath = Union[pathlib.Path, str, os.PathLike]
 Workbook = openpyxl.workbook.workbook.Workbook
 Sheet = openpyxl.worksheet.worksheet.Worksheet
 Cell = openpyxl.cell.cell.Cell
 
 
-def openwb(filepath: Filepath) -> Workbook:
+def openwb(filepath: Path) -> Workbook:
     wb = openpyxl.load_workbook(filepath)
     return wb
 

@@ -23,7 +23,7 @@ def parse_column_name(name: str) -> tuple[str]:
     if match:
         account_code = match.group().strip()
     account_name = clean_name(name.replace(account_code, ""))
-    account_code = account_code.replace(".", "=>")
+    account_code = account_code.strip(".").replace(".", "=>")
 
     return account_code, account_name
 
