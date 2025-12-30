@@ -1,134 +1,200 @@
+"""RTN Excel file reader and data transformation.
+
+This module handles reading specific sheets from RTN Excel files and transforming
+them into normalized long-format tables.
+"""
 
 import csv
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any, Literal
 
-from .account import expand_account_hierarchy, get_accounts_column
-from .excel import Sheet, openwb, to_value
-from .extract import get_accounts_data, get_rows
+from .account import expand_account_hierarchy, extract_account_column
+from .constants import (
+    ACCOUNT_COLUMN,
+    DATE_COLUMN,
+    MILLION_MULTIPLIER,
+    MONTH_COLUMN,
+    NA_VALUE,
+    SHEET_CONFIGS,
+    VALUE_COLUMN,
+    YEAR_COLUMN,
+)
+from .excel import Sheet, open_workbook, cell_to_value
+from .extract import build_account_data, extract_sheet_rows
 from .table import Tbl, apply, get_header
 
-sheets = [
-    "1.1",
-    "1.2",
-    "1.3",
-    "1.4",
-    "1.5",
-    "1.6",
-    "2.1",
-    "2.2",
-    "2.3",
-    "2.4",
-    "2.5",
-    "2.6",
-    "4.1",
-]
+PeriodType = Literal["monthly", "yearly"]
 
 
-def tbl_values(data: Tbl) -> Tbl:
-    return Tbl([apply(col, to_value) for col in data.data])
+def convert_cells_to_values(data: Tbl) -> Tbl:
+    """Convert all Cell objects in table to their Python values.
+
+    Args:
+        data: Table containing Excel Cell objects.
+
+    Returns:
+        Table with Cell objects converted to values.
+    """
+    return Tbl([apply(column, cell_to_value) for column in data.data])
 
 
-def rename_accounts_columns_to_codes(data: Tbl, account_hierarchy: Tbl) -> Tbl:
-    new_data = data.data.copy()
-    for i, account_code in enumerate(account_hierarchy["account_code"][1:], 1):
-        new_data[i][0] = account_code
-    new_data = Tbl(new_data)
-    return new_data
+def convert_to_millions(value: Any) -> int | None:
+    """Convert numeric value to millions.
+
+    Args:
+        value: Value to convert (expected to be numeric or "n.a.").
+
+    Returns:
+        Value multiplied by 1,000,000, or None if value is "n.a.".
+    """
+    if value == NA_VALUE:
+        return None
+    return int(value) * MILLION_MULTIPLIER
 
 
-def split_datetime_column(data: Tbl, datetime_column_name: str) -> Tbl:
+def split_date_column(data: Tbl, column_name: str) -> Tbl:
+    """Split datetime column into separate year and month columns.
+
+    Args:
+        data: Table with datetime column.
+        column_name: Name of the datetime column to split.
+
+    Returns:
+        Table with datetime column replaced by year and month columns.
+    """
     new_data = data.data.copy()
     header = get_header(new_data)
-    index = header.index(datetime_column_name)
-    dates_col = new_data[index]
-    year_col = ["year"] + [dt.year for dt in dates_col[1:]]
-    new_data[index] = year_col
-    month_col = ["month"] + [dt.month for dt in dates_col[1:]]
-    new_data.insert(index + 1, month_col)
-    new_data = Tbl(new_data)
-    return new_data
+    column_index = header.index(column_name)
+
+    dates_column = new_data[column_index]
+    year_column = [YEAR_COLUMN] + [date.year for date in dates_column[1:]]
+    month_column = [MONTH_COLUMN] + [date.month for date in dates_column[1:]]
+
+    new_data[column_index] = year_column
+    new_data.insert(column_index + 1, month_column)
+
+    return Tbl(new_data)
 
 
-def _read(
-    sh: Sheet,
-    rows: Sequence[int],
-    drop_cols: Sequence[int] = (),
-    period: str = "monthly",
-) -> tuple[Tbl]:
-    data = Tbl(get_rows(sh, *rows))
+def read_sheet_data(
+    sheet: Sheet,
+    min_row: int,
+    max_row: int,
+    drop_cols: list[int],
+    period: PeriodType,
+) -> tuple[Tbl, Tbl]:
+    """Read and transform data from an Excel sheet.
+
+    Performs the complete data transformation pipeline:
+    1. Extract rows from sheet
+    2. Remove unnecessary columns
+    3. Rename first column to "date"
+    4. Build account hierarchy
+    5. Convert cells to values
+    6. Melt to long format
+    7. Split date into year/month (if monthly)
+
+    Args:
+        sheet: Excel worksheet object.
+        min_row: First row to read.
+        max_row: Last row to read.
+        drop_cols: Indices of columns to drop.
+        period: Period type ("monthly" or "yearly").
+
+    Returns:
+        Tuple of (data_table, account_hierarchy_table).
+    """
+    # Extract raw data
+    raw_data = Tbl(extract_sheet_rows(sheet, min_row, max_row))
+
+    # Remove unnecessary columns
     if drop_cols:
-        data = data.drop_cols(drop_cols)
-    data.data[0][0] = "date"
-    accounts_data = get_accounts_data(get_accounts_column(data))
+        raw_data = raw_data.drop_cols(drop_cols)
+
+    # Rename first column to standard name
+    raw_data.data[0][0] = DATE_COLUMN
+
+    # Build account hierarchy
+    account_cells = extract_account_column(raw_data)
+    accounts_data = build_account_data(account_cells)
     account_hierarchy = expand_account_hierarchy(accounts_data)
-    data = tbl_values(data)
+
+    # Convert Cell objects to values
+    data = convert_cells_to_values(raw_data)
+
+    # Transform to long format
     data = data.melt(
-        id_cols=["date"],
-        var_name="account",
+        id_cols=[DATE_COLUMN], var_name=ACCOUNT_COLUMN, value_name=VALUE_COLUMN
     )
+
+    # Handle period-specific transformations
     if period == "monthly":
-        data = split_datetime_column(data, "date")
+        data = split_date_column(data, DATE_COLUMN)
     elif period == "yearly":
-        data = data.rename(date="year")
+        data = data.rename(**{DATE_COLUMN: YEAR_COLUMN})
+
     return data, account_hierarchy
 
 
-def read(filepath: Path) -> dict:
+def read_sheet(filepath: Path, sheet_name: str) -> tuple[Tbl, Tbl]:
+    """Read a specific sheet from RTN Excel file.
 
-    def to_million(x: Any) -> int:
-        if x == "n.a.":
-            return None
-        return int(x) * 1_000_000
+    Args:
+        filepath: Path to the Excel file.
+        sheet_name: Name of the sheet to read (must be in SHEET_CONFIGS).
 
-    def read_1_2(wb) -> tuple[Tbl]:
-        sh = wb["1.2"]
-        data, account_hierarchy = _read(sh, rows=(5, 162), period="monthly")
-        data = data.assign(
-            value=apply(data["value"][1:], to_million),
-        )
-        return data, account_hierarchy
+    Returns:
+        Tuple of (data_table, account_hierarchy_table).
 
-    def read_1_3(wb) -> tuple[Tbl]:
-        sh = wb["1.3"]
-        data, account_hierarchy = _read(sh, rows=(5, 65), drop_cols=[1], period="monthly")
-        data = data.assign(
-            value=apply(data["value"][1:], to_million),
-        )
-        return data, account_hierarchy
+    Raises:
+        ValueError: If sheet_name is not configured.
+        KeyError: If sheet doesn't exist in workbook.
+    """
+    if sheet_name not in SHEET_CONFIGS:
+        available_sheets = ", ".join(SHEET_CONFIGS.keys())
+        raise ValueError(f"Unknown sheet '{sheet_name}'. Available: {available_sheets}")
 
-    def read_1_6(wb) -> tuple[Tbl]:
-        sh = wb["1.6"]
-        data, account_hierarchy = _read(sh, rows=(5, 24), period="monthly")
-        data = data.assign(
-            value=apply(data["value"][1:], to_million),
-        )
-        return data, account_hierarchy
+    config = SHEET_CONFIGS[sheet_name]
+    workbook = open_workbook(filepath)
+    sheet = workbook[sheet_name]
 
-    def read_2_2_a(wb) -> tuple[Tbl]:
-        sh = wb["2.2-A"]
-        data, account_hierarchy = _read(sh, rows=(5, 162), period="yearly")
-        data = data.assign(
-            value=apply(data["value"][1:], to_million),
-        )
-        return data, account_hierarchy
+    data, account_hierarchy = read_sheet_data(
+        sheet=sheet,
+        min_row=config["min_row"],
+        max_row=config["max_row"],
+        drop_cols=config["drop_cols"],
+        period=config["period"],
+    )
 
-    wb = openwb(filepath)
+    # Convert values to millions
+    data = data.assign(value=apply(data[VALUE_COLUMN][1:], convert_to_millions))
 
-    data_1_2 = read_1_2(wb)
-    # data_1_3 = read_1_3(wb)
-    # data_1_6 = read_1_6(wb)
-    # data_2_2_a = read_2_2_a(wb)
-
-    # return {
-    #     "1.2": data_1_2,
-    #     "1.3": data_1_3,
-    #     "1.6": data_1_6,
-    #     "2.2-A": data_2_2_a,
-    # }
+    return data, account_hierarchy
 
 
-def write_csv(data: Tbl, filepath: Path):
-    with open(filepath, "w", encoding="utf-8", newline="\n") as f:
-        writer = csv.writer(f, delimiter=",", dialect=csv.QUOTE_ALL)
-        writer.writerows(data.transpose().data)
+def read_all_sheets(filepath: Path) -> dict[str, tuple[Tbl, Tbl]]:
+    """Read all configured sheets from RTN Excel file.
+
+    Args:
+        filepath: Path to the Excel file.
+
+    Returns:
+        Dictionary mapping sheet names to (data_table, account_hierarchy_table) tuples.
+    """
+    results = {}
+    for sheet_name in SHEET_CONFIGS:
+        results[sheet_name] = read_sheet(filepath, sheet_name)
+    return results
+
+
+def write_table_to_csv(data: Tbl, filepath: Path) -> None:
+    """Write table to CSV file.
+
+    Args:
+        data: Table to write.
+        filepath: Destination file path.
+    """
+    with filepath.open("w", encoding="utf-8", newline="\n") as file:
+        writer = csv.writer(file, delimiter=",", quoting=csv.QUOTE_ALL)
+        for row in data.transpose().iter_rows():
+            writer.writerow(row)

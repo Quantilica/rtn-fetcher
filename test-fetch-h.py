@@ -43,9 +43,8 @@ def main():
                     print(f"## {iframe_src}")
                     r = client.get(iframe_src)
                     dest_file.write_bytes(r.content)
-                elif content_type.startswith(
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                ) or content_type.startswith("application/vnd.ms-excel"):
+                else:
+                    print(f"## Unknown content type: {content_type}")
                     dest_file.write_bytes(r.content)
 
 

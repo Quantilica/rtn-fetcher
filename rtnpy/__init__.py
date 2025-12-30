@@ -1,0 +1,42 @@
+"""rtnpy - Biblioteca Python para processamento de dados do Resultado do Tesouro Nacional (RTN).
+
+Este pacote fornece ferramentas para baixar, extrair e transformar dados fiscais
+publicados pelo Tesouro Nacional do Brasil.
+"""
+
+__version__ = "0.1.0"
+
+# Public API - Main functionality
+from .fetcher import download_latest_file, fetch_publications_metadata
+from .reader import read_all_sheets, read_sheet, write_table_to_csv
+from .table import Tbl
+
+# Public API - Data extraction (advanced use)
+from .extract import (
+    build_account_data,
+    extract_publication_metadata,
+    extract_sheet_rows,
+)
+
+# Public API - Account processing (advanced use)
+from .account import expand_account_hierarchy, parse_account_name
+
+__all__ = [
+    # Version
+    "__version__",
+    # Main data structures
+    "Tbl",
+    # High-level functions
+    "download_latest_file",
+    "fetch_publications_metadata",
+    "read_sheet",
+    "read_all_sheets",
+    "write_table_to_csv",
+    # Data extraction
+    "extract_publication_metadata",
+    "extract_sheet_rows",
+    "build_account_data",
+    # Account processing
+    "parse_account_name",
+    "expand_account_hierarchy",
+]

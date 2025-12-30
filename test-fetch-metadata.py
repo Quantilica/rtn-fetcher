@@ -1,9 +1,9 @@
 import json
-from bs4 import BeautifulSoup
 from pathlib import Path
-from rtnpy import fetcher
 
-from rtnpy.extract import extract_metadata
+from bs4 import BeautifulSoup
+
+from rtnpy import fetch_publications_metadata, extract_publication_metadata
 
 
 def load_metadata():
@@ -12,7 +12,8 @@ def load_metadata():
         with open(filepath, "r", encoding="utf-8") as f:
             metadata = f.read()
     else:
-        metadata = fetcher.fetch_metadata()
+        metadata = fetch_publications_metadata()
+        filepath.parent.mkdir(exist_ok=True, parents=True)
         with open(filepath, "w", encoding="utf-8") as f:
             f.write(metadata)
     return metadata
@@ -21,9 +22,15 @@ def load_metadata():
 def main():
     metadata = load_metadata()
     soup = BeautifulSoup(metadata, "html.parser")
-    cards_infos = extract_metadata(soup)
-    with open("data/metadata.json", "w", encoding="utf-8") as f:
-        json.dump(cards_infos, f, ensure_ascii=False, indent=1)
+    publications = extract_publication_metadata(soup)
+
+    output_path = Path("data/metadata.json")
+    output_path.parent.mkdir(exist_ok=True, parents=True)
+
+    with output_path.open("w", encoding="utf-8") as f:
+        json.dump(publications, f, ensure_ascii=False, indent=2)
+
+    print(f"Saved {len(publications)} publications to {output_path}")
 
 
 if __name__ == "__main__":
