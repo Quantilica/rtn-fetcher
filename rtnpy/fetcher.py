@@ -4,6 +4,12 @@ from pathlib import Path
 import httpx
 
 
+def fetch_metadata() -> str:
+    url = "https://apiapex.tesouro.gov.br/aria//v1/thot/custom/rtn?pageSize=9999999"
+    r = httpx.get(url, timeout=60)
+    return r.text
+
+
 def get_destfilename(modified: dt.datetime) -> str:
     filename = f"rtn_{modified:%Y%m%d%H%M}.xlsx"
     return filename

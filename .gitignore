@@ -3,5 +3,5 @@ build/
 dist/
 *.egg-info
 
-# Poetry
-poetry.lock
+# UV lock file
+uv.lock
