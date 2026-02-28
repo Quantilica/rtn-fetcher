@@ -29,6 +29,16 @@ from rtnpy import (
 )
 
 
+HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/131.0.0.0 "
+        "Safari/537.36 "
+        "Edg/131.0.0.0"
+    )
+}
+
 DEFAULT_DATA_DIR = Path("data")
 DEFAULT_HTML = DEFAULT_DATA_DIR / "metadata.html"
 DEFAULT_JSON = DEFAULT_DATA_DIR / "metadata.json"
@@ -101,17 +111,7 @@ def cmd_download(args: argparse.Namespace) -> int:
     with metadata_path.open("r", encoding=args.encoding) as f:
         publications = json.load(f)
 
-    headers = {
-        "User-Agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/131.0.0.0 "
-            "Safari/537.36 "
-            "Edg/131.0.0.0"
-        )
-    }
-
-    with httpx.Client(headers=headers, timeout=600) as client:
+    with httpx.Client(headers=HEADERS, timeout=600) as client:
         for pub in publications:
             _download_publication_links(pub, client, Path(args.dest), args.encoding)
 
