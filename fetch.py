@@ -126,7 +126,12 @@ def cmd_download(args: argparse.Namespace) -> int:
                 async with semaphore:
                     try:
                         await _download_link_async(
-                            pub, filename, url, client, Path(args.dest), args.encoding
+                            pub,
+                            filename,
+                            url,
+                            client,
+                            Path(args.dest),
+                            args.encoding,
                         )
                     except Exception as exc:
                         print(f"Error downloading {url}: {exc}")
@@ -155,33 +160,52 @@ def cmd_latest(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="fetch", description="RTN data helper CLI")
+    parser = argparse.ArgumentParser(
+        prog="fetch",
+        description="RTN data helper CLI",
+    )
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_meta = sub.add_parser(
-        "metadata", help="Fetch metadata HTML and generate metadata.json"
+        "metadata",
+        help="Fetch metadata HTML and generate metadata.json",
     )
     p_meta.add_argument(
-        "--html", default=str(DEFAULT_HTML), help="Output metadata HTML path"
+        "--html",
+        default=str(DEFAULT_HTML),
+        help="Output metadata HTML path",
     )
     p_meta.add_argument(
-        "--json", default=str(DEFAULT_JSON), help="Output metadata JSON path"
+        "--json",
+        default=str(DEFAULT_JSON),
+        help="Output metadata JSON path",
     )
     p_meta.add_argument("--encoding", default="utf-8", help="File encoding")
     p_meta.add_argument(
-        "--force", action="store_true", help="Refetch HTML even if it exists"
+        "--force",
+        action="store_true",
+        help="Refetch HTML even if it exists",
     )
     p_meta.set_defaults(func=cmd_metadata)
 
-    p_dl = sub.add_parser("download", help="Download files referenced in metadata.json")
-    p_dl.add_argument(
-        "--metadata", default=str(DEFAULT_JSON), help="Input metadata JSON path"
+    p_dl = sub.add_parser(
+        "download",
+        help="Download files referenced in metadata.json",
     )
     p_dl.add_argument(
-        "--dest", default=str(DEFAULT_DATA_DIR), help="Destination root directory"
+        "--metadata",
+        default=str(DEFAULT_JSON),
+        help="Input metadata JSON path",
     )
     p_dl.add_argument(
-        "--encoding", default="utf-8", help="File encoding for HTML files"
+        "--dest",
+        default=str(DEFAULT_DATA_DIR),
+        help="Destination root directory",
+    )
+    p_dl.add_argument(
+        "--encoding",
+        default="utf-8",
+        help="File encoding for HTML files",
     )
     p_dl.add_argument(
         "--concurrency",
@@ -193,7 +217,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_latest = sub.add_parser("latest", help="Download latest single file")
     p_latest.add_argument(
-        "--dest", default=str(DEFAULT_DATA_DIR), help="Destination directory"
+        "--dest",
+        default=str(DEFAULT_DATA_DIR),
+        help="Destination directory",
     )
     p_latest.set_defaults(func=cmd_latest)
 
