@@ -69,41 +69,6 @@ def cmd_metadata(args: argparse.Namespace) -> int:
     return 0
 
 
-def _download_publication_links(
-    pub: Dict, client: httpx.Client, dest_root: Path, encoding: str
-) -> None:
-    id_publicacao = pub.get("id_publicacao")
-    titulo = pub.get("titulo")
-    ano = pub.get("ano_publicacao")
-    mes = pub.get("mes_publicacao")
-
-    print(f"# {id_publicacao} {titulo} ({ano}-{mes:0>2})")
-    dest_dir = dest_root / f"{ano}-{mes:0>2}"
-    dest_dir.mkdir(parents=True, exist_ok=True)
-
-    # kept for backwards-compatibility (unused by async download)
-    for filename, url in pub.get("links", {}).items():
-        dest_file = dest_dir / filename
-        if dest_file.exists():
-            continue
-        print(f"Downloading {url} -> {dest_file}")
-        r = client.get(url, follow_redirects=True)
-        content_type = r.headers.get("Content-Type", "")
-        if content_type.startswith("text/html"):
-            soup = BeautifulSoup(r.text, "html.parser")
-            iframe = soup.find("iframe")
-            if iframe and iframe.get("src"):
-                iframe_src = iframe["src"]
-                print(f"Following iframe src: {iframe_src}")
-                r = client.get(iframe_src)
-                dest_file.write_bytes(r.content)
-            else:
-                # If no iframe, save the HTML
-                dest_file.write_text(r.text, encoding=encoding)
-        else:
-            dest_file.write_bytes(r.content)
-
-
 async def _download_link_async(
     pub: Dict,
     filename: str,
