@@ -18,6 +18,7 @@ import argparse
 import json
 from pathlib import Path
 from typing import Dict
+import asyncio
 
 import httpx
 from bs4 import BeautifulSoup
@@ -80,6 +81,7 @@ def _download_publication_links(
     dest_dir = dest_root / f"{ano}-{mes:0>2}"
     dest_dir.mkdir(parents=True, exist_ok=True)
 
+    # kept for backwards-compatibility (unused by async download)
     for filename, url in pub.get("links", {}).items():
         dest_file = dest_dir / filename
         if dest_file.exists():
@@ -102,6 +104,43 @@ def _download_publication_links(
             dest_file.write_bytes(r.content)
 
 
+async def _download_link_async(
+    pub: Dict,
+    filename: str,
+    url: str,
+    client: httpx.AsyncClient,
+    dest_root: Path,
+    encoding: str,
+) -> None:
+    """Asynchronously download a single publication link to disk."""
+    ano = pub.get("ano_publicacao")
+    mes = pub.get("mes_publicacao")
+    dest_dir = dest_root / f"{ano}-{mes:0>2}"
+    dest_dir.mkdir(parents=True, exist_ok=True)
+
+    dest_file = dest_dir / filename
+    if dest_file.exists():
+        return
+
+    print(f"Downloading {url} -> {dest_file}")
+    r = await client.get(url, follow_redirects=True)
+    content_type = r.headers.get("Content-Type", "")
+    if content_type.startswith("text/html"):
+        soup = BeautifulSoup(r.text, "html.parser")
+        iframe = soup.find("iframe")
+        if iframe and iframe.get("src"):
+            iframe_src = iframe["src"]
+            print(f"Following iframe src: {iframe_src}")
+            r2 = await client.get(iframe_src)
+            data = r2.content
+            await asyncio.to_thread(dest_file.write_bytes, data)
+        else:
+            # Save HTML text
+            await asyncio.to_thread(dest_file.write_text, r.text, encoding)
+    else:
+        await asyncio.to_thread(dest_file.write_bytes, r.content)
+
+
 def cmd_download(args: argparse.Namespace) -> int:
     metadata_path = Path(args.metadata)
     if not metadata_path.exists():
@@ -111,10 +150,30 @@ def cmd_download(args: argparse.Namespace) -> int:
     with metadata_path.open("r", encoding=args.encoding) as f:
         publications = json.load(f)
 
-    with httpx.Client(headers=HEADERS, timeout=600) as client:
-        for pub in publications:
-            _download_publication_links(pub, client, Path(args.dest), args.encoding)
+    # Run asynchronous downloads with concurrency control
+    async def _run_async_downloads() -> None:
+        semaphore = asyncio.Semaphore(args.concurrency)
 
+        async with httpx.AsyncClient(headers=HEADERS, timeout=600) as client:
+            tasks = []
+
+            async def _bounded(pub: Dict, filename: str, url: str) -> None:
+                async with semaphore:
+                    try:
+                        await _download_link_async(
+                            pub, filename, url, client, Path(args.dest), args.encoding
+                        )
+                    except Exception as exc:
+                        print(f"Error downloading {url}: {exc}")
+
+            for pub in publications:
+                for filename, url in pub.get("links", {}).items():
+                    tasks.append(_bounded(pub, filename, url))
+
+            if tasks:
+                await asyncio.gather(*tasks)
+
+    asyncio.run(_run_async_downloads())
     return 0
 
 
@@ -158,6 +217,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_dl.add_argument(
         "--encoding", default="utf-8", help="File encoding for HTML files"
+    )
+    p_dl.add_argument(
+        "--concurrency",
+        type=int,
+        default=4,
+        help="Maximum concurrent downloads (default: 4)",
     )
     p_dl.set_defaults(func=cmd_download)
 
