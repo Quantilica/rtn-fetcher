@@ -9,10 +9,30 @@ from typing import Any
 
 from bs4 import BeautifulSoup
 
-from .account import parse_account_name
-from .constants import MIN_ROW_CELLS, SPECIAL_ACCOUNT_MARKER
+from .account import (
+    clean_account_name,
+    generated_account_code,
+    normalize_account_code,
+    parse_account_name,
+)
+from .constants import HIERARCHY_SEPARATOR, MIN_ROW_CELLS, SPECIAL_ACCOUNT_MARKER
 from .excel import Cell, Sheet, get_cell_indent
 from .table import Matrix, Tbl
+
+
+def deduplicate_account_rows(account_rows: list[list[Any]]) -> None:
+    """Make repeated account codes unique while preserving first occurrences."""
+    seen: dict[str, int] = {}
+
+    for index, account_code in enumerate(account_rows[0][1:], start=1):
+        count = seen.get(account_code, 0) + 1
+        seen[account_code] = count
+
+        if count == 1:
+            continue
+
+        unique_code = f"{account_code}#{count}"
+        account_rows[0][index] = unique_code
 
 
 def extract_available_periods(soup: BeautifulSoup) -> list[tuple[str, str]]:
@@ -100,6 +120,9 @@ def extract_sheet_rows(
     sheet: Sheet,
     min_row: int = 1,
     max_row: int = 1_048_576,
+    min_col: int = 1,
+    max_col: int | None = None,
+    min_filled_cells: int = MIN_ROW_CELLS,
 ) -> Matrix:
     """Extract non-empty rows from an Excel sheet.
 
@@ -116,15 +139,20 @@ def extract_sheet_rows(
     """
     rows = []
 
-    for row in sheet.iter_rows(min_row=min_row, max_row=max_row):
-        if not row[0].value:
+    for row in sheet.iter_rows(
+        min_row=min_row,
+        max_row=max_row,
+        min_col=min_col,
+        max_col=max_col,
+    ):
+        if all(cell.value is None for cell in row):
             continue
 
         non_empty_cells = [cell for cell in row if cell.value is not None]
-        if len(non_empty_cells) < MIN_ROW_CELLS:
+        if len(non_empty_cells) < min_filled_cells:
             continue
 
-        rows.append(non_empty_cells)
+        rows.append(list(row))
 
     return rows
 
@@ -183,12 +211,60 @@ def build_account_data(account_cells: list[Cell]) -> Tbl:
 
         # Generate code if not provided
         if not account_code:
-            account_code = "=>".join(str(part) for part in last_code_parts)
-
-        account_level = len(last_code_parts)
+            account_code = generated_account_code(last_code_parts)
+            account_level = len(last_code_parts)
+        else:
+            account_level = len(account_code.split(HIERARCHY_SEPARATOR))
 
         account_rows[0].append(account_code)
         account_rows[1].append(account_name)
         account_rows[2].append(account_level)
 
+    deduplicate_account_rows(account_rows)
+    return Tbl(account_rows)
+
+
+def build_account_data_from_columns(
+    code_cells: list[Cell],
+    name_cells: list[Cell],
+) -> Tbl:
+    """Build hierarchical account data from separate code and name columns."""
+    account_rows: list[list[Any]] = [
+        ["account_code"],
+        ["account_name"],
+        ["account_level"],
+    ]
+
+    last_code_parts = (0,)
+    indent_stack = (0.0,)
+
+    for code_cell, name_cell in zip(code_cells, name_cells):
+        current_indent = get_cell_indent(name_cell)
+
+        if current_indent > indent_stack[-1]:
+            indent_stack = (*indent_stack, current_indent)
+            last_code_parts = (*last_code_parts, 0)
+        elif current_indent < indent_stack[-1]:
+            while current_indent < indent_stack[-1]:
+                indent_stack = indent_stack[:-1]
+                last_code_parts = last_code_parts[:-1]
+
+        last_code_parts = last_code_parts[:-1] + (last_code_parts[-1] + 1,)
+
+        account_code = normalize_account_code(code_cell.value)
+        account_name = clean_account_name(
+            str(name_cell.value) if name_cell.value else ""
+        )
+
+        if not account_code:
+            account_code = generated_account_code(last_code_parts)
+            account_level = len(last_code_parts)
+        else:
+            account_level = len(account_code.split(HIERARCHY_SEPARATOR))
+
+        account_rows[0].append(account_code)
+        account_rows[1].append(account_name)
+        account_rows[2].append(account_level)
+
+    deduplicate_account_rows(account_rows)
     return Tbl(account_rows)

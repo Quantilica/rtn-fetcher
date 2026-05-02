@@ -23,12 +23,14 @@ SPECIAL_ACCOUNT_MARKER = "d/q"
 MIN_ROW_CELLS = 3
 MILLION_MULTIPLIER = 1_000_000
 NA_VALUE = "n.a."
+MISSING_VALUE_LABELS = {"", "-", "n.a.", "n.d.", "n\u00e3o disp", "na", "nd"}
 MAX_DISPLAY_ROWS = 10
 
 # Column Names
 DATE_COLUMN = "date"
 YEAR_COLUMN = "year"
 MONTH_COLUMN = "month"
+QUARTER_COLUMN = "quarter"
 ACCOUNT_COLUMN = "account"
 VALUE_COLUMN = "value"
 ACCOUNT_CODE_COLUMN = "account_code"
@@ -36,12 +38,32 @@ ACCOUNT_NAME_COLUMN = "account_name"
 ACCOUNT_LEVEL_COLUMN = "account_level"
 
 # Sheet Configurations
-# Format: {sheet_name: {min_row, max_row, drop_cols, period}}
+# Format: {sheet_name: {period, account_columns}}
 SHEET_CONFIGS = {
-    "1.2": {"min_row": 5, "max_row": 162, "drop_cols": [], "period": "monthly"},
-    "1.3": {"min_row": 5, "max_row": 65, "drop_cols": [1], "period": "monthly"},
-    "1.6": {"min_row": 5, "max_row": 24, "drop_cols": [], "period": "monthly"},
-    "2.2-A": {"min_row": 5, "max_row": 162, "drop_cols": [], "period": "yearly"},
+    "1.1": {"period": "monthly", "account_columns": 1},
+    "1.1-A": {"period": "monthly", "account_columns": 1},
+    "1.2": {"period": "monthly", "account_columns": 1},
+    "1.2-A": {"period": "monthly", "account_columns": 1},
+    "1.2-B": {"period": "monthly", "account_columns": 1},
+    "1.3": {"period": "monthly", "account_columns": 1},
+    "1.3-A": {"period": "monthly", "account_columns": 1},
+    "1.4": {"period": "monthly", "account_columns": 1},
+    "1.4-A": {"period": "monthly", "account_columns": 1},
+    "1.5": {"period": "monthly", "account_columns": 1},
+    "1.5-A": {"period": "monthly", "account_columns": 1},
+    "1.6": {"period": "monthly", "account_columns": 1},
+    "2.1": {"period": "yearly", "account_columns": 1},
+    "2.1-A": {"period": "yearly", "account_columns": 1},
+    "2.2": {"period": "yearly", "account_columns": 1},
+    "2.2-A": {"period": "yearly", "account_columns": 1},
+    "2.3": {"period": "yearly", "account_columns": 1},
+    "2.3-A": {"period": "yearly", "account_columns": 1},
+    "2.4": {"period": "yearly", "account_columns": 1},
+    "2.4-A": {"period": "yearly", "account_columns": 1},
+    "2.5": {"period": "yearly", "account_columns": 1},
+    "2.5-A": {"period": "yearly", "account_columns": 1},
+    "4.1": {"period": "quarterly", "account_columns": 2},
+    "4.2": {"period": "quarterly", "account_columns": 2},
 }
 
 AVAILABLE_SHEETS = list(SHEET_CONFIGS.keys())

@@ -101,20 +101,27 @@ for sheet_name, (data, accounts) in results.items():
 ### Processamento de Dados
 
 - ✅ Leitura de múltiplas abas da planilha RTN
+- ✅ Detecção dinâmica de cabeçalhos e linhas de dados nas abas suportadas
 - ✅ Extração de hierarquia de contas contábeis
 - ✅ Transformação de formato wide para long (unpivot)
 - ✅ Expansão automática de códigos hierárquicos
-- ✅ Conversão de valores para milhões de reais
-- ✅ Separação de datas em ano/mês
+- ✅ Conversão de valores em R$ milhões para reais
+- ✅ Preservação de indicadores em % do PIB como frações
+- ✅ Separação de períodos em ano/mês ou ano/trimestre
 
 ### Abas Suportadas
 
-| Aba     | Descrição                        | Período  | Linhas |
-|---------|----------------------------------|----------|--------|
-| 1.2     | Receitas e Despesas Primárias   | Mensal   | 5-162  |
-| 1.3     | Resultado Primário do Governo   | Mensal   | 5-65   |
-| 1.6     | Desagregação da Receita         | Mensal   | 5-24   |
-| 2.2-A   | Resultado Primário Anual        | Anual    | 5-162  |
+| Abas | Descrição | Período | Unidade |
+|------|-----------|---------|---------|
+| 1.1, 1.2, 1.3, 1.4, 1.5, 1.6 | Séries mensais em valores correntes | Mensal | R$ |
+| 1.1-A, 1.2-A, 1.3-A, 1.4-A, 1.5-A | Séries mensais em valores constantes | Mensal | R$ |
+| 1.2-B | Série mensal acumulada em 12 meses, IPCA | Mensal | R$ |
+| 2.1, 2.2, 2.3, 2.4, 2.5 | Séries anuais em valores correntes | Anual | R$ |
+| 2.1-A, 2.2-A, 2.3-A, 2.4-A, 2.5-A | Séries anuais em % do PIB | Anual | Fração do PIB |
+| 4.1, 4.2 | Séries trimestrais do Governo Central Orçamentário | Trimestral | R$ |
+
+As abas 3.1 e 3.2 têm layout comparativo de publicação corrente, com cabeçalhos
+multinível, e ainda não são normalizadas pelo leitor de séries históricas.
 
 ## 📊 Estrutura de Dados
 
@@ -126,8 +133,9 @@ Após processamento, os dados ficam em formato long com as seguintes colunas:
 |---------|------|-------------------------------------|
 | year    | int  | Ano de referência                   |
 | month   | int  | Mês de referência (dados mensais)   |
+| quarter | int  | Trimestre de referência (dados trimestrais) |
 | account | str  | Código hierárquico da conta         |
-| value   | int  | Valor em milhões de reais           |
+| value   | int/float | Valores monetários em reais; % do PIB como fração |
 
 ### Tabela de Hierarquia de Contas
 
@@ -254,9 +262,9 @@ rtnpy/
 ### Fluxo de Dados
 
 ```
-Excel File → extract_sheet_rows() → build_account_data()
+Excel File → extract_data_rows() → build_account_data()
     ↓
-convert_cells_to_values() → melt() → split_date_column()
+convert_cells_to_values() → melt() → split period columns
     ↓
 (data, account_hierarchy)
 ```

@@ -5,6 +5,8 @@ them into normalized long-format tables.
 """
 
 import csv
+import re
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Literal
 
@@ -12,18 +14,25 @@ from .account import expand_account_hierarchy, extract_account_column
 from .constants import (
     ACCOUNT_COLUMN,
     DATE_COLUMN,
+    MISSING_VALUE_LABELS,
     MILLION_MULTIPLIER,
     MONTH_COLUMN,
-    NA_VALUE,
+    QUARTER_COLUMN,
     SHEET_CONFIGS,
     VALUE_COLUMN,
     YEAR_COLUMN,
 )
 from .excel import Sheet, open_workbook, cell_to_value
-from .extract import build_account_data, extract_sheet_rows
+from .extract import (
+    build_account_data,
+    build_account_data_from_columns,
+)
 from .table import Tbl, apply, get_header
 
-PeriodType = Literal["monthly", "yearly"]
+PeriodType = Literal["monthly", "yearly", "quarterly"]
+
+QUARTER_PATTERN = re.compile(r"^(?P<year>\d{4})-(?P<quarter>I|II|III|IV|[1-4])$")
+ROMAN_QUARTERS = {"I": 1, "II": 2, "III": 3, "IV": 4}
 
 
 def convert_cells_to_values(data: Tbl) -> Tbl:
@@ -39,17 +48,34 @@ def convert_cells_to_values(data: Tbl) -> Tbl:
 
 
 def convert_to_millions(value: Any) -> int | None:
-    """Convert numeric value to millions.
+    """Convert a value expressed in R$ millions to reais.
 
     Args:
-        value: Value to convert (expected to be numeric or "n.a.").
+        value: Value to convert (expected to be numeric or a missing marker).
 
     Returns:
-        Value multiplied by 1,000,000, or None if value is "n.a.".
+        Value multiplied by 1,000,000, or None if value is missing.
     """
-    if value == NA_VALUE:
+    converted = convert_value(value, MILLION_MULTIPLIER)
+    return None if converted is None else int(converted)
+
+
+def convert_value(value: Any, multiplier: int = 1) -> int | float | str | None:
+    """Normalize spreadsheet values and apply the configured unit multiplier."""
+    if value is None:
         return None
-    return int(value) * MILLION_MULTIPLIER
+
+    if isinstance(value, str):
+        stripped = value.strip()
+        folded = stripped.casefold()
+        if folded in MISSING_VALUE_LABELS or folded.startswith("n\u00e3o disp"):
+            return None
+        value = stripped
+
+    if multiplier == MILLION_MULTIPLIER:
+        return int(round(float(value) * multiplier))
+
+    return value
 
 
 def split_date_column(data: Tbl, column_name: str) -> Tbl:
@@ -76,48 +102,218 @@ def split_date_column(data: Tbl, column_name: str) -> Tbl:
     return Tbl(new_data)
 
 
+def split_quarter_column(data: Tbl, column_name: str) -> Tbl:
+    """Split quarter labels like "2024-I" into year and quarter columns."""
+    new_data = data.data.copy()
+    header = get_header(new_data)
+    column_index = header.index(column_name)
+
+    years = [YEAR_COLUMN]
+    quarters = [QUARTER_COLUMN]
+
+    for period in new_data[column_index][1:]:
+        year, quarter = parse_quarter(period)
+        years.append(year)
+        quarters.append(quarter)
+
+    new_data[column_index] = years
+    new_data.insert(column_index + 1, quarters)
+
+    return Tbl(new_data)
+
+
+def parse_quarter(value: Any) -> tuple[int, int]:
+    """Parse RTN quarter labels such as "2024-I" or "2024-1"."""
+    match = QUARTER_PATTERN.match(str(value).strip())
+    if not match:
+        raise ValueError(f"Invalid quarterly period: {value!r}")
+
+    quarter_text = match.group("quarter")
+    quarter = (
+        ROMAN_QUARTERS[quarter_text]
+        if quarter_text in ROMAN_QUARTERS
+        else int(quarter_text)
+    )
+    return int(match.group("year")), quarter
+
+
+def is_period_value(value: Any, period: PeriodType) -> bool:
+    """Return whether a cell value looks like a period header."""
+    if period == "monthly":
+        return isinstance(value, (date, datetime))
+    if period == "yearly":
+        return (
+            isinstance(value, (int, float))
+            and not isinstance(value, bool)
+            and float(value).is_integer()
+            and 1900 <= int(value) <= 2200
+        )
+    if period == "quarterly":
+        return bool(QUARTER_PATTERN.match(str(value).strip()))
+    return False
+
+
+def find_header_row(sheet: Sheet, period: PeriodType, account_columns: int) -> int:
+    """Find the row containing the period headers."""
+    period_start_index = account_columns
+
+    for row in sheet.iter_rows():
+        values = [cell.value for cell in row]
+        period_count = sum(
+            is_period_value(value, period) for value in values[period_start_index:]
+        )
+        if period_count >= 3:
+            return row[0].row
+
+    raise ValueError(f"Could not find period header row in sheet '{sheet.title}'")
+
+
+def find_period_bounds(
+    sheet: Sheet,
+    header_row: int,
+    period: PeriodType,
+    account_columns: int,
+) -> tuple[int, int]:
+    """Find the first and last columns containing period headers."""
+    first_period_col = account_columns + 1
+    period_columns = []
+
+    for column in range(first_period_col, sheet.max_column + 1):
+        value = sheet.cell(header_row, column).value
+        if is_period_value(value, period):
+            period_columns.append(column)
+        elif period_columns:
+            break
+
+    if not period_columns:
+        raise ValueError(f"Could not find period columns in sheet '{sheet.title}'")
+
+    return period_columns[0], period_columns[-1]
+
+
+def is_metadata_row(row: list[Any], account_columns: int) -> bool:
+    """Identify note/source/section-header rows that are not observations."""
+    account_values = [cell.value for cell in row[:account_columns]]
+    account_text = " ".join(str(value).strip() for value in account_values if value)
+    account_text_lower = account_text.casefold()
+
+    if not account_text:
+        return True
+
+    metadata_prefixes = ("obs.", "fonte:", "memorando")
+    if account_text_lower.startswith(metadata_prefixes):
+        return True
+
+    if "pib nominal" in account_text_lower:
+        return True
+
+    return bool(re.match(r"^\d+/", account_text_lower))
+
+
+def extract_data_rows(
+    sheet: Sheet,
+    period: PeriodType,
+    account_columns: int,
+) -> list[list[Any]]:
+    """Extract the header row and data rows for a configured RTN sheet."""
+    header_row = find_header_row(sheet, period, account_columns)
+    _, last_period_col = find_period_bounds(
+        sheet=sheet,
+        header_row=header_row,
+        period=period,
+        account_columns=account_columns,
+    )
+
+    rows = [
+        [sheet.cell(header_row, column) for column in range(1, last_period_col + 1)]
+    ]
+
+    for row_index in range(header_row + 1, sheet.max_row + 1):
+        row = [
+            sheet.cell(row_index, column)
+            for column in range(1, last_period_col + 1)
+        ]
+        period_values = [cell.value for cell in row[account_columns:]]
+
+        if is_metadata_row(row, account_columns):
+            continue
+        if not any(value is not None for value in period_values):
+            continue
+
+        rows.append(row)
+
+    if len(rows) == 1:
+        raise ValueError(f"No data rows found in sheet '{sheet.title}'")
+
+    return rows
+
+
+def detect_value_multiplier(sheet: Sheet) -> int:
+    """Infer whether values should be converted from R$ millions to reais."""
+    unit_text = str(sheet.cell(3, 1).value or "").casefold()
+    if "r$" in unit_text and "milh" in unit_text:
+        return MILLION_MULTIPLIER
+    return 1
+
+
+def build_wide_table(
+    rows: list[list[Any]],
+    account_columns: int,
+) -> tuple[Tbl, Tbl]:
+    """Build a wide table and account hierarchy from extracted worksheet rows."""
+    if account_columns == 1:
+        raw_data = Tbl(rows)
+        raw_data.data[0][0] = DATE_COLUMN
+
+        account_cells = extract_account_column(raw_data)
+        accounts_data = build_account_data(account_cells)
+
+        account_codes = accounts_data["account_code"][1:]
+        for column, account_code in zip(raw_data.data[1:], account_codes):
+            column[0] = account_code
+
+        return raw_data, expand_account_hierarchy(accounts_data)
+
+    header_row = rows[0]
+    data_rows = rows[1:]
+    raw_columns = [[DATE_COLUMN, *header_row[account_columns:]]]
+
+    accounts_data = build_account_data_from_columns(
+        code_cells=[row[0] for row in data_rows],
+        name_cells=[row[1] for row in data_rows],
+    )
+
+    for row, account_code in zip(data_rows, accounts_data["account_code"][1:]):
+        raw_columns.append([account_code, *row[account_columns:]])
+
+    return Tbl(raw_columns), expand_account_hierarchy(accounts_data)
+
+
 def read_sheet_data(
     sheet: Sheet,
-    min_row: int,
-    max_row: int,
-    drop_cols: list[int],
     period: PeriodType,
+    account_columns: int = 1,
 ) -> tuple[Tbl, Tbl]:
     """Read and transform data from an Excel sheet.
 
     Performs the complete data transformation pipeline:
-    1. Extract rows from sheet
-    2. Remove unnecessary columns
-    3. Rename first column to "date"
-    4. Build account hierarchy
-    5. Convert cells to values
-    6. Melt to long format
-    7. Split date into year/month (if monthly)
+    1. Detect the period header and data rows
+    2. Build account hierarchy
+    3. Convert cells to values
+    4. Melt to long format
+    5. Split period into year/month or year/quarter when needed
 
     Args:
         sheet: Excel worksheet object.
-        min_row: First row to read.
-        max_row: Last row to read.
-        drop_cols: Indices of columns to drop.
-        period: Period type ("monthly" or "yearly").
+        period: Period type ("monthly", "yearly", or "quarterly").
+        account_columns: Number of leading columns used to identify accounts.
 
     Returns:
         Tuple of (data_table, account_hierarchy_table).
     """
-    # Extract raw data
-    raw_data = Tbl(extract_sheet_rows(sheet, min_row, max_row))
-
-    # Remove unnecessary columns
-    if drop_cols:
-        raw_data = raw_data.drop_cols(drop_cols)
-
-    # Rename first column to standard name
-    raw_data.data[0][0] = DATE_COLUMN
-
-    # Build account hierarchy
-    account_cells = extract_account_column(raw_data)
-    accounts_data = build_account_data(account_cells)
-    account_hierarchy = expand_account_hierarchy(accounts_data)
+    # Extract raw data and build account hierarchy
+    rows = extract_data_rows(sheet, period=period, account_columns=account_columns)
+    raw_data, account_hierarchy = build_wide_table(rows, account_columns)
 
     # Convert Cell objects to values
     data = convert_cells_to_values(raw_data)
@@ -132,6 +328,8 @@ def read_sheet_data(
         data = split_date_column(data, DATE_COLUMN)
     elif period == "yearly":
         data = data.rename(**{DATE_COLUMN: YEAR_COLUMN})
+    elif period == "quarterly":
+        data = split_quarter_column(data, DATE_COLUMN)
 
     return data, account_hierarchy
 
@@ -154,20 +352,29 @@ def read_sheet(filepath: Path, sheet_name: str) -> tuple[Tbl, Tbl]:
         available_sheets = ", ".join(SHEET_CONFIGS.keys())
         raise ValueError(f"Unknown sheet '{sheet_name}'. Available: {available_sheets}")
 
-    config = SHEET_CONFIGS[sheet_name]
     workbook = open_workbook(filepath)
+    return read_workbook_sheet(workbook, sheet_name)
+
+
+def read_workbook_sheet(workbook: Any, sheet_name: str) -> tuple[Tbl, Tbl]:
+    """Read a configured sheet from an already opened workbook."""
+    config = SHEET_CONFIGS[sheet_name]
     sheet = workbook[sheet_name]
 
     data, account_hierarchy = read_sheet_data(
         sheet=sheet,
-        min_row=config["min_row"],
-        max_row=config["max_row"],
-        drop_cols=config["drop_cols"],
         period=config["period"],
+        account_columns=config["account_columns"],
     )
 
-    # Convert values to millions
-    data = data.assign(value=apply(data[VALUE_COLUMN][1:], convert_to_millions))
+    # Convert values according to the unit declared in the sheet.
+    multiplier = detect_value_multiplier(sheet)
+    data = data.assign(
+        value=apply(
+            data[VALUE_COLUMN][1:],
+            lambda value: convert_value(value, multiplier),
+        )
+    )
 
     return data, account_hierarchy
 
@@ -182,8 +389,11 @@ def read_all_sheets(filepath: Path) -> dict[str, tuple[Tbl, Tbl]]:
         Dictionary mapping sheet names to (data_table, account_hierarchy_table) tuples.
     """
     results = {}
+    workbook = open_workbook(filepath)
     for sheet_name in SHEET_CONFIGS:
-        results[sheet_name] = read_sheet(filepath, sheet_name)
+        if sheet_name not in workbook.sheetnames:
+            continue
+        results[sheet_name] = read_workbook_sheet(workbook, sheet_name)
     return results
 
 

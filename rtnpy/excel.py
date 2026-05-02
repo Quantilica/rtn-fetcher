@@ -8,11 +8,9 @@ from pathlib import Path
 from typing import Any
 
 import openpyxl
-
-# Type aliases for better readability
-Workbook = openpyxl.workbook.workbook.Workbook
-Sheet = openpyxl.worksheet.worksheet.Worksheet
-Cell = openpyxl.cell.cell.Cell
+from openpyxl.cell.cell import Cell
+from openpyxl.workbook.workbook import Workbook
+from openpyxl.worksheet.worksheet import Worksheet as Sheet
 
 
 def open_workbook(filepath: Path) -> Workbook:
@@ -26,9 +24,9 @@ def open_workbook(filepath: Path) -> Workbook:
 
     Raises:
         FileNotFoundError: If the file doesn't exist.
-        openpyxl.utils.exceptions.InvalidFileException: If the file is not a valid Excel file.
+        openpyxl.utils.exceptions.InvalidFileException: If the file is invalid.
     """
-    return openpyxl.load_workbook(filepath)
+    return openpyxl.load_workbook(filepath, data_only=True)
 
 
 def get_cell_indent(cell: Cell) -> float:
