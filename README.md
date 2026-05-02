@@ -89,6 +89,20 @@ for sheet_name, (data, accounts) in results.items():
     print(f"{sheet_name}: {data.nrows} linhas de dados")
 ```
 
+### Exportar para Excel ou SQLite
+
+Scripts prontos para exportar todos os dados:
+
+```bash
+# Exportar para arquivo Excel formatado
+python export_to_excel.py
+
+# Exportar para banco de dados SQLite
+python export_to_sqlite.py
+```
+
+Ambos scripts baixam a planilha mais recente e exportam automaticamente com hierarquia de contas.
+
 ## 🔧 Funcionalidades
 
 ### Download de Dados
@@ -141,7 +155,7 @@ Após processamento, os dados ficam em formato long com as seguintes colunas:
 
 | Coluna        | Tipo | Descrição                              |
 |---------------|------|----------------------------------------|
-| account_code  | str  | Código hierárquico (ex: "1=>2=>3")     |
+| account_code  | str  | Código hierárquico (ex: "1.2.3")       |
 | account_name  | str  | Nome completo da conta                 |
 | account_level | int  | Nível hierárquico                      |
 | P_1, P_2, ... | str  | Nome de cada parte da hierarquia       |
@@ -151,14 +165,14 @@ Após processamento, os dados ficam em formato long com as seguintes colunas:
 ```python
 # Dados
 year  month  account  value
-2024  1      1=>1     1500000000
-2024  1      1=>2     2300000000
-2024  2      1=>1     1600000000
+2024  1      1.1      1500000000
+2024  1      1.2      2300000000
+2024  2      1.1      1600000000
 
 # Hierarquia
 account_code  account_name                account_level  P_1       P_2
-1=>1          1.1 Receitas Correntes     2              Receitas  Receitas Correntes
-1=>2          1.2 Receitas de Capital    2              Receitas  Receitas de Capital
+1.1           1.1 Receitas Correntes     2              Receitas  Receitas Correntes
+1.2           1.2 Receitas de Capital    2              Receitas  Receitas de Capital
 ```
 
 ## 📚 API Reference
@@ -167,24 +181,31 @@ account_code  account_name                account_level  P_1       P_2
 
 #### `download_latest_file(destination_dir: Path) -> Path | None`
 
-Baixa a planilha RTN mais recente.
+Baixa a planilha RTN mais recente do servidor do Tesouro Nacional.
 
 **Parâmetros:**
 - `destination_dir`: Diretório onde salvar o arquivo
 
 **Retorna:**
-- `Path` do arquivo baixado, ou `None` se já existe
+- `Path` do arquivo baixado, ou `None` se arquivo já existe
+
+#### `fetch_publications_metadata() -> list[dict]`
+
+Busca metadados de todas as publicações RTN disponíveis.
+
+**Retorna:**
+- Lista de dicionários com informações das publicações
 
 #### `read_sheet(filepath: Path, sheet_name: str) -> tuple[Tbl, Tbl]`
 
-Lê uma aba específica da planilha RTN.
+Lê e normaliza uma aba específica da planilha RTN.
 
 **Parâmetros:**
 - `filepath`: Caminho para o arquivo Excel
-- `sheet_name`: Nome da aba ("1.2", "1.3", "1.6", "2.2-A")
+- `sheet_name`: Nome da aba ("1.2", "1.3", "1.6", "2.2-A", etc.)
 
 **Retorna:**
-- Tupla de `(dados, hierarquia_contas)`
+- Tupla de `(dados, hierarquia_contas)` em formato long normalizado
 
 **Exceções:**
 - `ValueError`: Se a aba não estiver configurada
@@ -192,7 +213,7 @@ Lê uma aba específica da planilha RTN.
 
 #### `read_all_sheets(filepath: Path) -> dict[str, tuple[Tbl, Tbl]]`
 
-Lê todas as abas configuradas.
+Lê e normaliza todas as abas configuradas.
 
 **Parâmetros:**
 - `filepath`: Caminho para o arquivo Excel
@@ -202,7 +223,7 @@ Lê todas as abas configuradas.
 
 #### `write_table_to_csv(data: Tbl, filepath: Path) -> None`
 
-Exporta tabela para CSV.
+Exporta tabela para arquivo CSV.
 
 **Parâmetros:**
 - `data`: Tabela a exportar
@@ -210,7 +231,7 @@ Exporta tabela para CSV.
 
 ### Classe Tbl
 
-Estrutura de dados tabular orientada a colunas.
+Estrutura de dados tabular orientada a colunas (dados armazenados por coluna, não por linha).
 
 ```python
 from rtnpy import Tbl
@@ -224,10 +245,14 @@ data = Tbl([
 # Acessar colunas
 names = data["nome"]  # ["nome", "Alice", "Bob"]
 
+# Propriedades
+print(f"Dimensões: {data.nrows} linhas × {data.ncols} colunas")
+
 # Operações
 data_subset = data.select("nome")
 data_with_city = data.assign(cidade=["SP", "RJ"])
 long_data = data.melt(id_cols=["nome"])
+renamed = data.rename(nome="name", idade="age")
 
 # Iterar por linhas
 for row in data.iter_rows():
@@ -235,13 +260,43 @@ for row in data.iter_rows():
 ```
 
 **Métodos principais:**
-- `select(*columns)`: Seleciona colunas
+- `select(*columns)`: Seleciona colunas específicas
 - `assign(**columns)`: Adiciona/atualiza colunas
-- `melt(id_cols, var_name, value_name)`: Transforma wide → long
+- `melt(id_cols, var_name, value_name)`: Transforma wide → long (unpivot)
 - `transpose()`: Transpõe tabela
-- `drop_rows(rows)`: Remove linhas
-- `drop_cols(cols)`: Remove colunas
+- `insert(table, index)`: Insere colunas de outra tabela
+- `drop_rows(rows)`: Remove linhas por índice
+- `drop_cols(cols)`: Remove colunas por índice
 - `rename(**names)`: Renomeia colunas
+- `iter_rows()`: Itera sobre linhas
+- `get_header()`: Retorna nomes de colunas
+
+**Atributos:**
+- `data`: Matriz de colunas (lista de listas)
+- `nrows`: Número de linhas (incluindo cabeçalho)
+- `ncols`: Número de colunas
+
+### Funções Avançadas
+
+#### `extract_sheet_rows(sheet: Sheet) -> list[list[Any]]`
+
+Extrai linhas brutos de uma aba Excel sem normalização.
+
+#### `extract_publication_metadata(html: str) -> dict[str, Any]`
+
+Extrai metadados de publicação de HTML.
+
+#### `build_account_data(table: Tbl) -> Tbl`
+
+Constrói hierarquia de contas a partir de tabela de dados.
+
+#### `parse_account_name(name: str) -> tuple[str, str]`
+
+Extrai código e nome de uma string combinada (ex: "1.2.3 Descrição").
+
+#### `expand_account_hierarchy(code: str, name: str, level: int) -> tuple[str, list[str]]`
+
+Expande código hierárquico com os nomes de cada nível.
 
 ## 🏗️ Arquitetura
 
