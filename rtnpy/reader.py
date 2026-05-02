@@ -379,21 +379,56 @@ def read_workbook_sheet(workbook: Any, sheet_name: str) -> tuple[Tbl, Tbl]:
     return data, account_hierarchy
 
 
-def read_all_sheets(filepath: Path) -> dict[str, tuple[Tbl, Tbl]]:
+def _normalize_index_code(code: str) -> str:
+    """Normalize an Índice sheet code to match SHEET_CONFIGS keys.
+
+    Strips trailing dots and dots before dashes:
+    "1.1." -> "1.1", "1.5.-A" -> "1.5-A"
+    """
+    code = re.sub(r"\.(?=-)", "", code)
+    return code.rstrip(".")
+
+
+def _read_index_titles(workbook: Any) -> dict[str, str]:
+    """Read human-readable sheet titles from an open workbook's Índice sheet."""
+    index_sheet_name = next(
+        (name for name in workbook.sheetnames if "ndice" in name), None
+    )
+    if index_sheet_name is None:
+        return {}
+
+    ws = workbook[index_sheet_name]
+    titles: dict[str, str] = {}
+
+    for row in ws.iter_rows(values_only=True):
+        code_raw = row[0]
+        description = row[1] if len(row) > 1 else None
+        if not code_raw or not description:
+            continue
+        code = _normalize_index_code(str(code_raw).strip())
+        if code in SHEET_CONFIGS:
+            titles[code] = str(description).strip()
+
+    return titles
+
+
+def read_all_sheets(filepath: Path) -> dict[str, tuple[Tbl, Tbl, str | None]]:
     """Read all configured sheets from RTN Excel file.
 
     Args:
         filepath: Path to the Excel file.
 
     Returns:
-        Dictionary mapping sheet names to (data_table, account_hierarchy_table) tuples.
+        Dictionary mapping sheet names to (data_table, account_hierarchy_table, title) tuples.
     """
-    results = {}
     workbook = open_workbook(filepath)
+    titles = _read_index_titles(workbook)
+    results = {}
     for sheet_name in SHEET_CONFIGS:
         if sheet_name not in workbook.sheetnames:
             continue
-        results[sheet_name] = read_workbook_sheet(workbook, sheet_name)
+        data, accounts = read_workbook_sheet(workbook, sheet_name)
+        results[sheet_name] = (data, accounts, titles.get(sheet_name))
     return results
 
 
