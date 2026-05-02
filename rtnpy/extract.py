@@ -35,29 +35,6 @@ def deduplicate_account_rows(account_rows: list[list[Any]]) -> None:
         account_rows[0][index] = unique_code
 
 
-def extract_available_periods(soup: BeautifulSoup) -> list[tuple[str, str]]:
-    """Extract available year-month combinations from metadata page.
-
-    Args:
-        soup: BeautifulSoup object of the RTN metadata page.
-
-    Returns:
-        List of (year, month) tuples for available publications.
-    """
-    periods = []
-    year_options = soup.select("select#filtro-ano option")
-    month_options = soup.select("select#filtro-mes option")
-
-    for year_option in year_options:
-        year_text = year_option.text
-        for month_option in month_options:
-            years_attr = month_option.get("data-nr-ano", "")
-            if isinstance(years_attr, str) and year_text in years_attr.split(":"):
-                periods.append((year_text, month_option.text))
-
-    return periods
-
-
 def extract_publication_metadata(soup: BeautifulSoup) -> list[dict[str, Any]]:
     """Extract publication metadata from RTN HTML page.
 

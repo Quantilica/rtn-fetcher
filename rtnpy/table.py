@@ -63,17 +63,6 @@ class Tbl:
         """
         return Tbl(transpose(self.data))
 
-    def select(self, *columns: str) -> "Tbl":
-        """Select specific columns.
-
-        Args:
-            columns: Names of columns to select.
-
-        Returns:
-            New table with only the selected columns.
-        """
-        return Tbl(select(self.data, *columns))
-
     def assign(self, **columns: Column) -> "Tbl":
         """Add or update columns.
 
@@ -84,18 +73,6 @@ class Tbl:
             New table with assigned columns.
         """
         return Tbl(assign(self.data, **columns))
-
-    def insert(self, data: "Tbl", index: int = 0) -> "Tbl":
-        """Insert columns from another table at a specific position.
-
-        Args:
-            data: Table whose columns to insert.
-            index: Position to insert columns at.
-
-        Returns:
-            New table with inserted columns.
-        """
-        return Tbl(insert(self.data, data.data, index))
 
     def melt(
         self,
@@ -114,28 +91,6 @@ class Tbl:
             New table in long format.
         """
         return Tbl(melt(self.data, id_cols, var_name, value_name))
-
-    def drop_rows(self, rows: list[int]) -> "Tbl":
-        """Remove specific rows by index.
-
-        Args:
-            rows: List of row indices to remove.
-
-        Returns:
-            New table without the specified rows.
-        """
-        return Tbl(drop_rows(self.data, rows))
-
-    def drop_cols(self, cols: list[int]) -> "Tbl":
-        """Remove specific columns by index.
-
-        Args:
-            cols: List of column indices to remove.
-
-        Returns:
-            New table without the specified columns.
-        """
-        return Tbl(drop_cols(self.data, cols))
 
     def rename(self, **names_to: str) -> "Tbl":
         """Rename columns.
@@ -280,52 +235,6 @@ def apply(column: Column, func: Callable[[Any], Any]) -> Column:
     return [func(value) for value in column]
 
 
-def insert(data1: Matrix, data2: Matrix, index: int = 0) -> Matrix:
-    """Insert columns from data2 into data1 at specified index.
-
-    Args:
-        data1: Primary matrix.
-        data2: Matrix to insert.
-        index: Position to insert at.
-
-    Returns:
-        Combined matrix.
-    """
-    return data1[:index] + data2 + data1[index:]
-
-
-def select(data: Matrix, *columns: str) -> Matrix:
-    """Select specific columns from matrix.
-
-    Args:
-        data: Source matrix.
-        *columns: Column names to select.
-
-    Returns:
-        Matrix with only selected columns.
-
-    Raises:
-        ValueError: If a column name is not found.
-    """
-    header = get_header(data)
-    indices = [header.index(column) for column in columns]
-    return [data[i] for i in indices]
-
-
-def where(func: Callable[[list[Any]], bool], data: Matrix) -> Matrix:
-    """Filter rows based on a predicate function.
-
-    Args:
-        func: Predicate function that takes a row and returns bool.
-        data: Matrix to filter.
-
-    Returns:
-        Filtered matrix.
-    """
-    filtered_rows = [row for row in iter_rows(transpose(data)) if func(row)]
-    return transpose(filtered_rows)
-
-
 def assign(data: Matrix, **columns: Column) -> Matrix:
     """Add or update columns in matrix.
 
@@ -348,35 +257,6 @@ def assign(data: Matrix, **columns: Column) -> Matrix:
             new_data.append(new_column)
 
     return new_data
-
-
-def drop_rows(data: Matrix, rows: list[int]) -> Matrix:
-    """Remove rows by index.
-
-    Args:
-        data: Source matrix.
-        rows: List of row indices to remove.
-
-    Returns:
-        Matrix without specified rows.
-    """
-    rows_set = set(rows)
-    filtered_rows = [row for i, row in enumerate(iter_rows(data)) if i not in rows_set]
-    return transpose(filtered_rows)
-
-
-def drop_cols(data: Matrix, cols: list[int]) -> Matrix:
-    """Remove columns by index.
-
-    Args:
-        data: Source matrix.
-        cols: List of column indices to remove.
-
-    Returns:
-        Matrix without specified columns.
-    """
-    cols_set = set(cols)
-    return [col for i, col in enumerate(data) if i not in cols_set]
 
 
 def rename(data: Matrix, **names_to: str) -> Matrix:
