@@ -41,13 +41,12 @@ HEADERS = {
 }
 
 DEFAULT_DATA_DIR = Path("data")
-DEFAULT_HTML = DEFAULT_DATA_DIR / "metadata.html"
-DEFAULT_JSON = DEFAULT_DATA_DIR / "metadata.json"
 
 
 def cmd_metadata(args: argparse.Namespace) -> int:
-    out_html = Path(args.html)
-    out_json = Path(args.json)
+    dest = Path(args.dest)
+    out_html = dest / "metadata.html"
+    out_json = dest / "metadata.json"
 
     if out_html.exists() and not args.force:
         with out_html.open("r", encoding=args.encoding) as f:
@@ -171,14 +170,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="Fetch metadata HTML and generate metadata.json",
     )
     p_meta.add_argument(
-        "--html",
-        default=str(DEFAULT_HTML),
-        help="Output metadata HTML path",
-    )
-    p_meta.add_argument(
-        "--json",
-        default=str(DEFAULT_JSON),
-        help="Output metadata JSON path",
+        "--dest",
+        default=str(DEFAULT_DATA_DIR),
+        help="Destination directory (metadata.html and metadata.json saved here)",
     )
     p_meta.add_argument("--encoding", default="utf-8", help="File encoding")
     p_meta.add_argument(
@@ -194,7 +188,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_dl.add_argument(
         "--metadata",
-        default=str(DEFAULT_JSON),
+        default=str(DEFAULT_DATA_DIR / "metadata.json"),
         help="Input metadata JSON path",
     )
     p_dl.add_argument(
