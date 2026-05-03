@@ -91,17 +91,21 @@ for sheet_name, (data, accounts) in results.items():
 
 ### Exportar para Excel ou SQLite
 
-Scripts prontos para exportar todos os dados:
+Use o comando `rtnpy export` com subcomandos:
 
 ```bash
 # Exportar para arquivo Excel formatado
-python export_to_excel.py
+rtnpy export excel
 
 # Exportar para banco de dados SQLite
-python export_to_sqlite.py
+rtnpy export sqlite
+
+# Customizar caminhos de entrada/saída
+rtnpy export excel --data-dir data --output meus_dados.xlsx
+rtnpy export sqlite --data-dir data --output meus_dados.db
 ```
 
-Ambos scripts baixam a planilha mais recente e exportam automaticamente com hierarquia de contas.
+Ambos comandos baixam a planilha mais recente e exportam automaticamente com hierarquia de contas.
 
 ## 🔧 Funcionalidades
 
@@ -173,6 +177,39 @@ year  month  account  value
 account_code  account_name                account_level  P_1       P_2
 1.1           1.1 Receitas Correntes     2              Receitas  Receitas Correntes
 1.2           1.2 Receitas de Capital    2              Receitas  Receitas de Capital
+```
+
+## 🖥️ Interface de Linha de Comando (CLI)
+
+Use o comando `rtnpy` para operações de download e exportação:
+
+```bash
+# Ver ajuda geral
+rtnpy --help
+
+# Operações de fetch
+rtnpy fetch metadata          # Busca metadados e cria metadata.json
+rtnpy fetch download          # Baixa arquivos listados em metadata.json
+rtnpy fetch latest            # Baixa o arquivo RTN mais recente
+
+# Operações de export
+rtnpy export excel            # Exporta para Excel com formatação
+rtnpy export sqlite           # Exporta para banco SQLite
+```
+
+### Opções de Fetch
+
+```bash
+rtnpy fetch metadata --dest data --force        # Refaz download mesmo se existe
+rtnpy fetch download --metadata data/metadata.json --concurrency 8
+rtnpy fetch latest --dest data
+```
+
+### Opções de Export
+
+```bash
+rtnpy export excel --data-dir data --output rtn_dados.xlsx
+rtnpy export sqlite --data-dir data --output rtn_dados.db
 ```
 
 ## 📚 API Reference
@@ -303,8 +340,9 @@ Expande código hierárquico com os nomes de cada nível.
 ### Módulos
 
 ```
-rtnpy/
+src/rtnpy/
 ├── __init__.py       # API pública
+├── cli.py            # Interface de linha de comando
 ├── constants.py      # Configurações centralizadas
 ├── table.py          # Estrutura de dados Tbl
 ├── excel.py          # Leitura de arquivos Excel
