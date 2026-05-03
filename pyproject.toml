@@ -13,3 +13,7 @@ dependencies = [
 
 [project.scripts]
 rtnpy = "rtnpy:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
