@@ -200,7 +200,7 @@ def is_metadata_row(row: list[Any], account_columns: int) -> bool:
     if not account_text:
         return True
 
-    metadata_prefixes = ("obs.", "fonte:", "memorando")
+    metadata_prefixes = ("obs.", "fonte:", "memorando", "memorando:")
     if account_text_lower.startswith(metadata_prefixes):
         return True
 
