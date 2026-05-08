@@ -44,6 +44,21 @@ pip install rtnpy
 - httpx
 - beautifulsoup4
 
+### Extras Opcionais
+
+Para análise de dados com pandas ou polars:
+
+```bash
+# Instalar com suporte a pandas
+pip install "rtnpy[pandas]"
+
+# Instalar com suporte a polars
+pip install "rtnpy[polars]"
+
+# Instalar ambos
+pip install "rtnpy[all]"
+```
+
 ## 🚀 Uso Rápido
 
 ### Download de Dados
@@ -89,6 +104,46 @@ for sheet_name, (data, accounts) in results.items():
     print(f"{sheet_name}: {data.nrows} linhas de dados")
 ```
 
+### Conversão para pandas/polars
+
+Converta dados para DataFrames nativos para análise avançada:
+
+#### Usando pandas
+
+```python
+from rtnpy import read_sheet, to_pandas
+
+data, accounts = read_sheet(filepath, "1.2")
+
+# Método 1: Usar função
+df = to_pandas(data)
+
+# Método 2: Usar método direto
+df = data.to_pandas()
+
+# Agora use operações pandas
+df_filtered = df[df["year"] >= 2023]
+df_pivot = df.pivot_table(values="value", index="account", columns="month")
+```
+
+#### Usando polars
+
+```python
+from rtnpy import read_sheet, to_polars
+
+data, accounts = read_sheet(filepath, "1.2")
+
+# Método 1: Usar função
+df = to_polars(data)
+
+# Método 2: Usar método direto
+df = data.to_polars()
+
+# Agora use operações polars (mais rápido para dados grandes)
+df_filtered = df.filter(df["year"] >= 2023)
+df_pivot = df.pivot(on="month", index="account", values="value")
+```
+
 ### Exportar para Excel ou SQLite
 
 Use o comando `rtnpy export` com subcomandos:
@@ -126,6 +181,12 @@ Ambos comandos baixam a planilha mais recente e exportam automaticamente com hie
 - ✅ Conversão de valores em R$ milhões para reais
 - ✅ Preservação de indicadores em % do PIB como frações
 - ✅ Separação de períodos em ano/mês ou ano/trimestre
+
+### Análise de Dados
+
+- ✅ Conversão para pandas DataFrame (análise flexível)
+- ✅ Conversão para polars DataFrame (análise de alto desempenho)
+- ✅ Integração com ecossistema de data science Python
 
 ### Abas Suportadas
 

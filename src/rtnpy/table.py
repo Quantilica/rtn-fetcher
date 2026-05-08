@@ -4,9 +4,13 @@ This module provides a column-oriented table structure (Tbl) and associated
 transformation functions for working with tabular data.
 """
 
-from typing import Any, Callable, Iterator
+from typing import TYPE_CHECKING, Any, Callable, Iterator
 
 from .constants import MAX_DISPLAY_ROWS
+
+if TYPE_CHECKING:
+    import pandas as pd
+    import polars as pl
 
 Column = list[Any]
 Matrix = list[Column]
@@ -149,6 +153,50 @@ class Tbl:
             f"{self.__class__.__name__}: {self.nrows} rows × {self.ncols} cols"
         )
         return "\n".join(lines)
+
+    def to_pandas(self) -> "pd.DataFrame":
+        """Convert to pandas DataFrame.
+
+        Requires pandas to be installed: pip install rtnpy[pandas]
+
+        Returns:
+            pandas DataFrame with same data and column names.
+
+        Raises:
+            ImportError: If pandas is not installed.
+        """
+        try:
+            import pandas as pd
+        except ImportError as e:
+            raise ImportError(
+                "pandas is required. Install with: pip install rtnpy[pandas]"
+            ) from e
+
+        header = self.get_header()
+        columns = {col_name: col_data[1:] for col_name, col_data in zip(header, self.data)}
+        return pd.DataFrame(columns)
+
+    def to_polars(self) -> "pl.DataFrame":
+        """Convert to polars DataFrame.
+
+        Requires polars to be installed: pip install rtnpy[polars]
+
+        Returns:
+            polars DataFrame with same data and column names.
+
+        Raises:
+            ImportError: If polars is not installed.
+        """
+        try:
+            import polars as pl
+        except ImportError as e:
+            raise ImportError(
+                "polars is required. Install with: pip install rtnpy[polars]"
+            ) from e
+
+        header = self.get_header()
+        columns = {col_name: col_data[1:] for col_name, col_data in zip(header, self.data)}
+        return pl.DataFrame(columns)
 
 
 def get_header(data: Matrix) -> list[Any]:

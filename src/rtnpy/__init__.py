@@ -21,6 +21,9 @@ from .extract import (
 # Public API - Account processing (advanced use)
 from .account import expand_account_hierarchy, parse_account_name
 
+# Public API - DataFrame conversion (optional, requires pandas/polars)
+from .dataframe import to_pandas, to_polars
+
 __all__ = [
     # Version
     "__version__",
@@ -39,4 +42,7 @@ __all__ = [
     # Account processing
     "parse_account_name",
     "expand_account_hierarchy",
+    # DataFrame conversion (optional)
+    "to_pandas",
+    "to_polars",
 ]
