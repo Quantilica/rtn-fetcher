@@ -1,29 +1,16 @@
-# rtn-fetcher
+# rtn-fetcher: Download e análise do Resultado do Tesouro Nacional
+
+![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square) ![Python](https://img.shields.io/badge/python-3.13+-blue.svg?style=flat-square)
 
 **rtn-fetcher** é uma biblioteca Python para download, extração e transformação de dados do Resultado do Tesouro Nacional (RTN).
 
-[![Python Version](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-
-## 📋 Índice
-
-- [Sobre](#sobre)
-- [Instalação](#instalação)
-- [Uso Rápido](#uso-rápido)
-- [Funcionalidades](#funcionalidades)
-- [Estrutura de Dados](#estrutura-de-dados)
-- [API Reference](#api-reference)
-- [Arquitetura](#arquitetura)
-- [Contribuindo](#contribuindo)
-- [Licença](#licença)
-
-## 🎯 Sobre
+## Sobre
 
 O Resultado do Tesouro Nacional (RTN) contém informações fiscais consolidadas do Governo Federal brasileiro, incluindo receitas, despesas e resultado primário. Esta biblioteca facilita o acesso programático a esses dados.
 
 **Fonte dos dados:** [Tesouro Nacional - RTN](https://www.gov.br/tesouronacional/pt-br/estatisticas-fiscais-e-planejamento/resultado-do-tesouro-nacional-rtn)
 
-## 📦 Instalação
+## Instalação
 
 ### Usando uv (recomendado)
 
@@ -49,17 +36,11 @@ pip install git+https://github.com/Quantilica/rtn-fetcher.git
 Para análise de dados com pandas ou polars:
 
 ```bash
-# Instalar com suporte a pandas
-pip install "rtn-fetcher[pandas]"
-
-# Instalar com suporte a polars
-pip install "rtn-fetcher[polars]"
-
-# Instalar ambos
-pip install "rtn-fetcher[all]"
+pip install "rtn-fetcher[pandas] @ git+https://github.com/Quantilica/rtn-fetcher.git"
+pip install "rtn-fetcher[polars] @ git+https://github.com/Quantilica/rtn-fetcher.git"
 ```
 
-## 🚀 Uso Rápido
+## Uso Rápido
 
 ### Download de Dados
 
@@ -162,31 +143,31 @@ rtn-fetcher export sqlite --data-dir data --output meus_dados.db
 
 Ambos comandos baixam a planilha mais recente e exportam automaticamente com hierarquia de contas.
 
-## 🔧 Funcionalidades
+## Funcionalidades
 
 ### Download de Dados
 
-- ✅ Download automático da planilha RTN mais recente
-- ✅ Detecção de arquivos já baixados (evita downloads duplicados)
-- ✅ Nomenclatura baseada em timestamp do arquivo
-- ✅ Acesso à API de metadados das publicações
+- Download automático da planilha RTN mais recente
+- Detecção de arquivos já baixados (evita downloads duplicados)
+- Nomenclatura baseada em timestamp do arquivo
+- Acesso à API de metadados das publicações
 
 ### Processamento de Dados
 
-- ✅ Leitura de múltiplas abas da planilha RTN
-- ✅ Detecção dinâmica de cabeçalhos e linhas de dados nas abas suportadas
-- ✅ Extração de hierarquia de contas contábeis
-- ✅ Transformação de formato wide para long (unpivot)
-- ✅ Expansão automática de códigos hierárquicos
-- ✅ Conversão de valores em R$ milhões para reais
-- ✅ Preservação de indicadores em % do PIB como frações
-- ✅ Separação de períodos em ano/mês ou ano/trimestre
+- Leitura de múltiplas abas da planilha RTN
+- Detecção dinâmica de cabeçalhos e linhas de dados nas abas suportadas
+- Extração de hierarquia de contas contábeis
+- Transformação de formato wide para long (unpivot)
+- Expansão automática de códigos hierárquicos
+- Conversão de valores em R$ milhões para reais
+- Preservação de indicadores em % do PIB como frações
+- Separação de períodos em ano/mês ou ano/trimestre
 
 ### Análise de Dados
 
-- ✅ Conversão para pandas DataFrame (análise flexível)
-- ✅ Conversão para polars DataFrame (análise de alto desempenho)
-- ✅ Integração com ecossistema de data science Python
+- Conversão para pandas DataFrame (análise flexível)
+- Conversão para polars DataFrame (análise de alto desempenho)
+- Integração com ecossistema de data science Python
 
 ### Abas Suportadas
 
@@ -202,7 +183,7 @@ Ambos comandos baixam a planilha mais recente e exportam automaticamente com hie
 As abas 3.1 e 3.2 têm layout comparativo de publicação corrente, com cabeçalhos
 multinível, e ainda não são normalizadas pelo leitor de séries históricas.
 
-## 📊 Estrutura de Dados
+## Estrutura de Dados
 
 ### Tabela de Dados (Long Format)
 
@@ -240,7 +221,7 @@ account_code  account_name                account_level  P_1       P_2
 1.2           1.2 Receitas de Capital    2              Receitas  Receitas de Capital
 ```
 
-## 🖥️ Interface de Linha de Comando (CLI)
+## Interface de Linha de Comando (CLI)
 
 Use o comando `rtn-fetcher` para operações de download e exportação:
 
@@ -273,7 +254,7 @@ rtn-fetcher export excel --data-dir data --output rtn_dados.xlsx
 rtn-fetcher export sqlite --data-dir data --output rtn_dados.db
 ```
 
-## 📚 API Reference
+## API Reference
 
 ### Funções Principais
 
@@ -396,7 +377,7 @@ Extrai código e nome de uma string combinada (ex: "1.2.3 Descrição").
 
 Expande código hierárquico com os nomes de cada nível.
 
-## 🏗️ Arquitetura
+## Arquitetura
 
 ### Módulos
 
@@ -431,21 +412,20 @@ convert_cells_to_values() → melt() → split period columns
 4. **Docstrings detalhadas**: Documentação em cada função
 5. **Separação de responsabilidades**: Cada módulo tem função clara
 
-## 🤝 Contribuindo
+## Desenvolvimento
 
-Contribuições são bem-vindas! Por favor:
+```bash
+git clone https://github.com/Quantilica/rtn-fetcher.git
+cd rtn-fetcher
+uv sync --dev
+uv run pytest
+```
 
-1. Fork o repositório
-2. Crie uma branch para sua feature (`git checkout -b feature/nova-funcionalidade`)
-3. Commit suas mudanças (`git commit -am 'Adiciona nova funcionalidade'`)
-4. Push para a branch (`git push origin feature/nova-funcionalidade`)
-5. Abra um Pull Request
+## Licença
 
-## 📄 Licença
+MIT — veja [LICENSE](LICENSE).
 
-Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para detalhes.
-
-## 🔗 Links
+## Links
 
 - [Tesouro Nacional - RTN](https://www.gov.br/tesouronacional/pt-br/estatisticas-fiscais-e-planejamento/resultado-do-tesouro-nacional-rtn)
 - [API do Tesouro](https://apiapex.tesouro.gov.br/)
