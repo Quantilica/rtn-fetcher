@@ -28,13 +28,13 @@ O Resultado do Tesouro Nacional (RTN) contém informações fiscais consolidadas
 ### Usando uv (recomendado)
 
 ```bash
-uv add rtn-fetcher
+uv add "git+https://github.com/Quantilica/rtn-fetcher.git"
 ```
 
 ### Usando pip
 
 ```bash
-pip install rtn-fetcher
+pip install git+https://github.com/Quantilica/rtn-fetcher.git
 ```
 
 ### Requisitos
