@@ -10,6 +10,10 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Literal
 
+from quantilica_core.exceptions import ParseError
+from quantilica_core.logging import log_step
+
+from . import logger
 from .account import expand_account_hierarchy, extract_account_column
 from .constants import (
     ACCOUNT_COLUMN,
@@ -126,7 +130,7 @@ def parse_quarter(value: Any) -> tuple[int, int]:
     """Parse RTN quarter labels such as "2024-I" or "2024-1"."""
     match = QUARTER_PATTERN.match(str(value).strip())
     if not match:
-        raise ValueError(f"Invalid quarterly period: {value!r}")
+        raise ParseError(f"Invalid quarterly period: {value!r}")
 
     quarter_text = match.group("quarter")
     quarter = (
@@ -165,7 +169,7 @@ def find_header_row(sheet: Sheet, period: PeriodType, account_columns: int) -> i
         if period_count >= 3:
             return row[0].row
 
-    raise ValueError(f"Could not find period header row in sheet '{sheet.title}'")
+    raise ParseError(f"Could not find period header row in sheet '{sheet.title}'")
 
 
 def find_period_bounds(
@@ -186,7 +190,7 @@ def find_period_bounds(
             break
 
     if not period_columns:
-        raise ValueError(f"Could not find period columns in sheet '{sheet.title}'")
+        raise ParseError(f"Could not find period columns in sheet '{sheet.title}'")
 
     return period_columns[0], period_columns[-1]
 
@@ -243,7 +247,7 @@ def extract_data_rows(
         rows.append(row)
 
     if len(rows) == 1:
-        raise ValueError(f"No data rows found in sheet '{sheet.title}'")
+        raise ParseError(f"No data rows found in sheet '{sheet.title}'")
 
     return rows
 
@@ -335,25 +339,14 @@ def read_sheet_data(
 
 
 def read_sheet(filepath: Path, sheet_name: str) -> tuple[Tbl, Tbl]:
-    """Read a specific sheet from RTN Excel file.
-
-    Args:
-        filepath: Path to the Excel file.
-        sheet_name: Name of the sheet to read (must be in SHEET_CONFIGS).
-
-    Returns:
-        Tuple of (data_table, account_hierarchy_table).
-
-    Raises:
-        ValueError: If sheet_name is not configured.
-        KeyError: If sheet doesn't exist in workbook.
-    """
+    """Read a specific sheet from RTN Excel file."""
     if sheet_name not in SHEET_CONFIGS:
         available_sheets = ", ".join(SHEET_CONFIGS.keys())
-        raise ValueError(f"Unknown sheet '{sheet_name}'. Available: {available_sheets}")
+        raise ParseError(f"Unknown sheet '{sheet_name}'. Available: {available_sheets}")
 
-    workbook = open_workbook(filepath)
-    return read_workbook_sheet(workbook, sheet_name)
+    with log_step(logger, "read-rtn-sheet", filepath=filepath.name, sheet=sheet_name):
+        workbook = open_workbook(filepath)
+        return read_workbook_sheet(workbook, sheet_name)
 
 
 def read_workbook_sheet(workbook: Any, sheet_name: str) -> tuple[Tbl, Tbl]:

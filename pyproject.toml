@@ -2,26 +2,62 @@
 name = "rtnpy"
 version = "0.1.0"
 description = "RTN data fetching and export utilities"
-license = { file = "LICENSE" }
 readme = "README.md"
-requires-python = ">=3.13"
+authors = [
+    { name = "Komesu, D.K.", email = "daniel@dkko.me" },
+]
+license = { file = "LICENSE" }
+requires-python = ">=3.12"
+keywords = [
+    "rtn",
+    "tesouro-nacional",
+    "fiscal",
+    "brazil",
+    "api-client",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+]
 dependencies = [
     "beautifulsoup4>=4.14.3",
-    "httpx>=0.28.1",
     "openpyxl>=3.1.5",
+    "quantilica-core @ git+https://github.com/Quantilica/quantilica-core.git",
 ]
 
-[project.optional-dependencies]
-pandas = ["pandas>=2.0.0"]
-polars = ["polars>=1.0.0"]
-all = ["pandas>=2.0.0", "polars>=1.0.0"]
+[project.urls]
+Homepage = "https://github.com/Quantilica/rtnpy"
+Repository = "https://github.com/Quantilica/rtnpy"
+Issues = "https://github.com/Quantilica/rtnpy/issues"
 
 [project.scripts]
 rtnpy = "rtnpy.cli:main"
 
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+[project.optional-dependencies]
+pandas = ["pandas>=2.0.0"]
+polars = ["polars>=1.0.0"]
+dev = [
+    "ruff>=0.9.0",
+    "pytest>=8.0.0",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/rtnpy"]
+
+[tool.ruff]
+line-length = 79
+lint.select = ["E", "F", "I", "UP", "B"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

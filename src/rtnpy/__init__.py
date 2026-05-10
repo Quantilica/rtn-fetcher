@@ -4,7 +4,12 @@ Este pacote fornece ferramentas para baixar, extrair e transformar dados fiscais
 publicados pelo Tesouro Nacional do Brasil.
 """
 
+from quantilica_core.logging import get_logger
+
 __version__ = "0.1.0"
+
+logger = get_logger(__name__)
+
 
 # Public API - Main functionality
 from .fetcher import download_latest_file, fetch_publications_metadata
