@@ -75,7 +75,7 @@ def download_latest_file(destination_dir: Path) -> Path:
             destination_path,
             source_id=SOURCE_ID,
             dataset_id=DATASET_ID,
-            producer="rtnpy",
+            producer="rtn-fetcher",
             params=params,
         )
 

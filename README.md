@@ -1,6 +1,6 @@
-# rtnpy
+# rtn-fetcher
 
-**rtnpy** é uma biblioteca Python para download, extração e transformação de dados do Resultado do Tesouro Nacional (RTN).
+**rtn-fetcher** é uma biblioteca Python para download, extração e transformação de dados do Resultado do Tesouro Nacional (RTN).
 
 [![Python Version](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
@@ -28,13 +28,13 @@ O Resultado do Tesouro Nacional (RTN) contém informações fiscais consolidadas
 ### Usando uv (recomendado)
 
 ```bash
-uv add rtnpy
+uv add rtn-fetcher
 ```
 
 ### Usando pip
 
 ```bash
-pip install rtnpy
+pip install rtn-fetcher
 ```
 
 ### Requisitos
@@ -50,13 +50,13 @@ Para análise de dados com pandas ou polars:
 
 ```bash
 # Instalar com suporte a pandas
-pip install "rtnpy[pandas]"
+pip install "rtn-fetcher[pandas]"
 
 # Instalar com suporte a polars
-pip install "rtnpy[polars]"
+pip install "rtn-fetcher[polars]"
 
 # Instalar ambos
-pip install "rtnpy[all]"
+pip install "rtn-fetcher[all]"
 ```
 
 ## 🚀 Uso Rápido
@@ -65,7 +65,7 @@ pip install "rtnpy[all]"
 
 ```python
 from pathlib import Path
-from rtnpy import download_latest_file
+from rtn_fetcher import download_latest_file
 
 # Download da planilha mais recente
 data_dir = Path("data")
@@ -76,7 +76,7 @@ print(f"Arquivo baixado: {filepath}")
 ### Leitura de Dados
 
 ```python
-from rtnpy import read_sheet, write_table_to_csv
+from rtn_fetcher import read_sheet, write_table_to_csv
 from pathlib import Path
 
 # Ler aba específica
@@ -96,7 +96,7 @@ write_table_to_csv(accounts, Path("output/rtn_1_2_accounts.csv"))
 ### Ler Todas as Abas
 
 ```python
-from rtnpy import read_all_sheets
+from rtn_fetcher import read_all_sheets
 
 results = read_all_sheets(filepath)
 
@@ -111,7 +111,7 @@ Converta dados para DataFrames nativos para análise avançada:
 #### Usando pandas
 
 ```python
-from rtnpy import read_sheet, to_pandas
+from rtn_fetcher import read_sheet, to_pandas
 
 data, accounts = read_sheet(filepath, "1.2")
 
@@ -129,7 +129,7 @@ df_pivot = df.pivot_table(values="value", index="account", columns="month")
 #### Usando polars
 
 ```python
-from rtnpy import read_sheet, to_polars
+from rtn_fetcher import read_sheet, to_polars
 
 data, accounts = read_sheet(filepath, "1.2")
 
@@ -146,18 +146,18 @@ df_pivot = df.pivot(on="month", index="account", values="value")
 
 ### Exportar para Excel ou SQLite
 
-Use o comando `rtnpy export` com subcomandos:
+Use o comando `rtn-fetcher export` com subcomandos:
 
 ```bash
 # Exportar para arquivo Excel formatado
-rtnpy export excel
+rtn-fetcher export excel
 
 # Exportar para banco de dados SQLite
-rtnpy export sqlite
+rtn-fetcher export sqlite
 
 # Customizar caminhos de entrada/saída
-rtnpy export excel --data-dir data --output meus_dados.xlsx
-rtnpy export sqlite --data-dir data --output meus_dados.db
+rtn-fetcher export excel --data-dir data --output meus_dados.xlsx
+rtn-fetcher export sqlite --data-dir data --output meus_dados.db
 ```
 
 Ambos comandos baixam a planilha mais recente e exportam automaticamente com hierarquia de contas.
@@ -242,35 +242,35 @@ account_code  account_name                account_level  P_1       P_2
 
 ## 🖥️ Interface de Linha de Comando (CLI)
 
-Use o comando `rtnpy` para operações de download e exportação:
+Use o comando `rtn-fetcher` para operações de download e exportação:
 
 ```bash
 # Ver ajuda geral
-rtnpy --help
+rtn-fetcher --help
 
 # Operações de fetch
-rtnpy fetch metadata          # Busca metadados e cria metadata.json
-rtnpy fetch download          # Baixa arquivos listados em metadata.json
-rtnpy fetch latest            # Baixa o arquivo RTN mais recente
+rtn-fetcher fetch metadata          # Busca metadados e cria metadata.json
+rtn-fetcher fetch download          # Baixa arquivos listados em metadata.json
+rtn-fetcher fetch latest            # Baixa o arquivo RTN mais recente
 
 # Operações de export
-rtnpy export excel            # Exporta para Excel com formatação
-rtnpy export sqlite           # Exporta para banco SQLite
+rtn-fetcher export excel            # Exporta para Excel com formatação
+rtn-fetcher export sqlite           # Exporta para banco SQLite
 ```
 
 ### Opções de Fetch
 
 ```bash
-rtnpy fetch metadata --dest data --force        # Refaz download mesmo se existe
-rtnpy fetch download --metadata data/metadata.json --concurrency 8
-rtnpy fetch latest --dest data
+rtn-fetcher fetch metadata --dest data --force        # Refaz download mesmo se existe
+rtn-fetcher fetch download --metadata data/metadata.json --concurrency 8
+rtn-fetcher fetch latest --dest data
 ```
 
 ### Opções de Export
 
 ```bash
-rtnpy export excel --data-dir data --output rtn_dados.xlsx
-rtnpy export sqlite --data-dir data --output rtn_dados.db
+rtn-fetcher export excel --data-dir data --output rtn_dados.xlsx
+rtn-fetcher export sqlite --data-dir data --output rtn_dados.db
 ```
 
 ## 📚 API Reference
@@ -332,7 +332,7 @@ Exporta tabela para arquivo CSV.
 Estrutura de dados tabular orientada a colunas (dados armazenados por coluna, não por linha).
 
 ```python
-from rtnpy import Tbl
+from rtn_fetcher import Tbl
 
 # Criar tabela
 data = Tbl([
@@ -401,7 +401,7 @@ Expande código hierárquico com os nomes de cada nível.
 ### Módulos
 
 ```
-src/rtnpy/
+src/rtn_fetcher/
 ├── __init__.py       # API pública
 ├── cli.py            # Interface de linha de comando
 ├── constants.py      # Configurações centralizadas

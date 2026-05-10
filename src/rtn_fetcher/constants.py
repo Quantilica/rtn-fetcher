@@ -1,7 +1,7 @@
 """Package-wide constants and configuration.
 
 This module contains all configuration values, URLs, and constants used
-throughout the rtnpy package.
+throughout the rtn-fetcher package.
 """
 
 # API Configuration

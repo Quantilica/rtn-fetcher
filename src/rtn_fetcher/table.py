@@ -157,7 +157,7 @@ class Tbl:
     def to_pandas(self) -> "pd.DataFrame":
         """Convert to pandas DataFrame.
 
-        Requires pandas to be installed: pip install rtnpy[pandas]
+        Requires pandas to be installed: pip install rtn-fetcher[pandas]
 
         Returns:
             pandas DataFrame with same data and column names.
@@ -169,7 +169,7 @@ class Tbl:
             import pandas as pd
         except ImportError as e:
             raise ImportError(
-                "pandas is required. Install with: pip install rtnpy[pandas]"
+                "pandas is required. Install with: pip install rtn-fetcher[pandas]"
             ) from e
 
         header = self.get_header()
@@ -179,7 +179,7 @@ class Tbl:
     def to_polars(self) -> "pl.DataFrame":
         """Convert to polars DataFrame.
 
-        Requires polars to be installed: pip install rtnpy[polars]
+        Requires polars to be installed: pip install rtn-fetcher[polars]
 
         Returns:
             polars DataFrame with same data and column names.
@@ -191,7 +191,7 @@ class Tbl:
             import polars as pl
         except ImportError as e:
             raise ImportError(
-                "polars is required. Install with: pip install rtnpy[polars]"
+                "polars is required. Install with: pip install rtn-fetcher[polars]"
             ) from e
 
         header = self.get_header()

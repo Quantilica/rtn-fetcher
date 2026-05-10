@@ -1,4 +1,4 @@
-"""rtnpy - Biblioteca Python para processamento de dados do Resultado do Tesouro Nacional (RTN).
+"""rtn-fetcher - Biblioteca Python para processamento de dados do Resultado do Tesouro Nacional (RTN).
 
 Este pacote fornece ferramentas para baixar, extrair e transformar dados fiscais
 publicados pelo Tesouro Nacional do Brasil.

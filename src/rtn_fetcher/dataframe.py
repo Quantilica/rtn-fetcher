@@ -17,7 +17,7 @@ def to_pandas(tbl: Tbl) -> "pd.DataFrame":
     """Convert Tbl to pandas DataFrame.
 
     Requires pandas to be installed:
-        pip install rtnpy[pandas]
+        pip install rtn-fetcher[pandas]
 
     Args:
         tbl: Tbl object to convert.
@@ -29,7 +29,7 @@ def to_pandas(tbl: Tbl) -> "pd.DataFrame":
         ImportError: If pandas is not installed.
 
     Example:
-        >>> from rtnpy import read_sheet, to_pandas
+        >>> from rtn_fetcher import read_sheet, to_pandas
         >>> data, accounts = read_sheet(filepath, "1.2")
         >>> df = to_pandas(data)
         >>> df.head()
@@ -39,7 +39,7 @@ def to_pandas(tbl: Tbl) -> "pd.DataFrame":
     except ImportError as e:
         raise ImportError(
             "pandas is required to use to_pandas(). "
-            "Install it with: pip install rtnpy[pandas]"
+            "Install it with: pip install rtn-fetcher[pandas]"
         ) from e
 
     header = tbl.get_header()
@@ -51,7 +51,7 @@ def to_polars(tbl: Tbl) -> "pl.DataFrame":
     """Convert Tbl to polars DataFrame.
 
     Requires polars to be installed:
-        pip install rtnpy[polars]
+        pip install rtn-fetcher[polars]
 
     Args:
         tbl: Tbl object to convert.
@@ -63,7 +63,7 @@ def to_polars(tbl: Tbl) -> "pl.DataFrame":
         ImportError: If polars is not installed.
 
     Example:
-        >>> from rtnpy import read_sheet, to_polars
+        >>> from rtn_fetcher import read_sheet, to_polars
         >>> data, accounts = read_sheet(filepath, "1.2")
         >>> df = to_polars(data)
         >>> df.head()
@@ -73,7 +73,7 @@ def to_polars(tbl: Tbl) -> "pl.DataFrame":
     except ImportError as e:
         raise ImportError(
             "polars is required to use to_polars(). "
-            "Install it with: pip install rtnpy[polars]"
+            "Install it with: pip install rtn-fetcher[polars]"
         ) from e
 
     header = tbl.get_header()

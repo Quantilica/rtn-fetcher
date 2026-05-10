@@ -6,11 +6,11 @@ Provides these subcommand groups:
 - export: excel, sqlite
 
 Usage examples:
-  rtnpy fetch metadata
-  rtnpy fetch download
-  rtnpy fetch latest
-  rtnpy export excel
-  rtnpy export sqlite
+  rtn-fetcher fetch metadata
+  rtn-fetcher fetch download
+  rtn-fetcher fetch latest
+  rtn-fetcher export excel
+  rtn-fetcher export sqlite
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ from openpyxl.styles import Font, PatternFill
 from quantilica_core.http import BROWSER_HEADERS, AsyncHttpClient
 from quantilica_core.logging import configure_cli_logging
 
-from rtnpy import (
+from rtn_fetcher import (
     Tbl,
     download_latest_file,
     extract_publication_metadata,
@@ -36,7 +36,7 @@ from rtnpy import (
     logger,
     read_all_sheets,
 )
-from rtnpy.fetcher import download_publication_link
+from rtn_fetcher.fetcher import download_publication_link
 
 DEFAULT_DATA_DIR = Path("data")
 
@@ -347,7 +347,7 @@ def cmd_export_sqlite(args: argparse.Namespace) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="rtnpy",
+        prog="rtn-fetcher",
         description="RTN data helper CLI - fetch and export utilities",
     )
     parser.add_argument(
