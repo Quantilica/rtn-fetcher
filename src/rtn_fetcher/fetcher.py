@@ -13,6 +13,7 @@ from quantilica_core.exceptions import ParseError
 from quantilica_core.files import write_bytes_atomic, write_text_atomic
 from quantilica_core.http import AsyncHttpClient, HttpClient
 from quantilica_core.logging import log_step
+from quantilica_core.storage import stamp_filename
 
 from . import logger
 from .constants import (
@@ -35,8 +36,12 @@ def fetch_publications_metadata() -> str:
 
 
 def generate_filename(modified_date: dt.datetime) -> str:
-    """Generate standardized filename for RTN file."""
-    return f"rtn_{modified_date:%Y%m%d%H%M}.xlsx"
+    """Generate a stamped filename for the RTN file.
+
+    Returns ``rtn@YYYYMMDDTHHMMSS.xlsx`` using the upstream Last-Modified
+    timestamp so each new version produces a distinct local file.
+    """
+    return stamp_filename("rtn", "xlsx", modified_date, precision="datetime")
 
 
 def download_latest_file(destination_dir: Path) -> Path:
