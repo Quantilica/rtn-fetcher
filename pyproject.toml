@@ -40,6 +40,9 @@ Issues = "https://github.com/Quantilica/rtn-fetcher/issues"
 [project.scripts]
 rtn-fetcher = "rtn_fetcher.cli:main"
 
+[project.entry-points."quantilica.fetchers"]
+rtn = "rtn_fetcher.plugin:app"
+
 [project.optional-dependencies]
 pandas = ["pandas>=2.0.0"]
 polars = ["polars>=1.0.0"]
