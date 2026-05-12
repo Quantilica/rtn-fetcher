@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import logging
 import sqlite3
 from datetime import date
 from pathlib import Path
@@ -27,6 +28,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill
 from quantilica_core.http import BROWSER_HEADERS, AsyncHttpClient
 from quantilica_core.logging import configure_cli_logging
+from quantilica_core.progress import batch_progress
 
 from rtn_fetcher import (
     Tbl,
@@ -110,6 +112,7 @@ async def _bounded_download(
     dest_root: Path,
     encoding: str,
     semaphore: asyncio.Semaphore,
+    pbar=None,
 ) -> None:
     """Download one publication link, gated by ``semaphore``."""
     ano = pub.get("ano_publicacao")
@@ -119,6 +122,8 @@ async def _bounded_download(
 
     dest_file = dest_dir / filename
     if dest_file.exists():
+        if pbar is not None:
+            pbar.update(1)
         return
 
     logger.info(f"Downloading {url} -> {dest_file}")
@@ -129,6 +134,8 @@ async def _bounded_download(
             )
         except Exception as exc:
             logger.error(f"Failed to download {url}: {exc}")
+    if pbar is not None:
+        pbar.update(1)
 
 
 def cmd_download(args: argparse.Namespace) -> int:
@@ -141,7 +148,10 @@ def cmd_download(args: argparse.Namespace) -> int:
     with metadata_path.open("r", encoding=args.encoding) as f:
         publications = json.load(f)
 
-    async def _run_async_downloads() -> None:
+    show_progress = not args.verbose
+    total = sum(len(pub.get("links", {})) for pub in publications)
+
+    async def _run_async_downloads(pbar) -> None:
         semaphore = asyncio.Semaphore(args.concurrency)
         client = AsyncHttpClient(timeout=600.0, headers=BROWSER_HEADERS)
         tasks = [
@@ -153,6 +163,7 @@ def cmd_download(args: argparse.Namespace) -> int:
                 args.output,
                 args.encoding,
                 semaphore,
+                pbar,
             )
             for pub in publications
             for filename, url in pub.get("links", {}).items()
@@ -160,7 +171,11 @@ def cmd_download(args: argparse.Namespace) -> int:
         if tasks:
             await asyncio.gather(*tasks)
 
-    asyncio.run(_run_async_downloads())
+    if show_progress and total > 0:
+        with batch_progress("rtn-download", total=total) as pbar:
+            asyncio.run(_run_async_downloads(pbar))
+    else:
+        asyncio.run(_run_async_downloads(None))
     return 0
 
 
@@ -351,10 +366,10 @@ def build_parser() -> argparse.ArgumentParser:
         description="RTN data helper CLI - fetch and export utilities",
     )
     parser.add_argument(
-        "-v",
         "--verbose",
         action="store_true",
-        help="Enable DEBUG-level logging",
+        default=False,
+        help="Exibir logs detalhados em vez de barra de progresso",
     )
     sub = parser.add_subparsers(dest="group", required=True)
 
@@ -470,6 +485,8 @@ def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
     configure_cli_logging(verbose=args.verbose)
+    if not args.verbose:
+        logging.getLogger("rtn_fetcher").setLevel(logging.WARNING)
     return args.func(args)
 
 
