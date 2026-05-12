@@ -38,7 +38,7 @@ from rtn_fetcher import (
 )
 from rtn_fetcher.fetcher import download_publication_link
 
-DEFAULT_DATA_DIR = Path("data")
+DEFAULT_DATA_DIR = Path("/data/rtn")
 
 HEADER_FONT = Font(bold=True, color="FFFFFF")
 HEADER_FILL = PatternFill(fill_type="solid", fgColor="1F4E79")
@@ -78,7 +78,7 @@ def get_column_names(table: Tbl) -> list[str]:
 
 def cmd_metadata(args: argparse.Namespace) -> int:
     """Fetch metadata HTML and generate metadata.json."""
-    dest = Path(args.dest)
+    dest = args.output
     out_html = dest / "metadata.html"
     out_json = dest / "metadata.json"
 
@@ -150,7 +150,7 @@ def cmd_download(args: argparse.Namespace) -> int:
                 filename,
                 url,
                 client,
-                Path(args.dest),
+                args.output,
                 args.encoding,
                 semaphore,
             )
@@ -166,7 +166,7 @@ def cmd_download(args: argparse.Namespace) -> int:
 
 def cmd_latest(args: argparse.Namespace) -> int:
     """Download latest single file."""
-    dest = Path(args.dest)
+    dest = args.output
     dest.mkdir(parents=True, exist_ok=True)
     filepath = download_latest_file(dest)
     logger.info(f"Latest RTN file: {filepath}")
@@ -175,8 +175,8 @@ def cmd_latest(args: argparse.Namespace) -> int:
 
 def cmd_export_excel(args: argparse.Namespace) -> int:
     """Export RTN data to Excel."""
-    data_dir = Path(args.data_dir)
-    data_dir.mkdir(exist_ok=True)
+    data_dir = args.output
+    data_dir.mkdir(parents=True, exist_ok=True)
 
     logger.info("Checking for latest RTN file...")
     filepath = download_latest_file(data_dir)
@@ -185,7 +185,7 @@ def cmd_export_excel(args: argparse.Namespace) -> int:
     logger.info(f"Reading all sheets from {filepath}...")
     results = read_all_sheets(filepath)
 
-    output_path = Path(args.output)
+    output_path = Path(args.save_as)
     wb = Workbook()
     wb.remove(wb.active)
 
@@ -249,8 +249,8 @@ def cmd_export_excel(args: argparse.Namespace) -> int:
 
 def cmd_export_sqlite(args: argparse.Namespace) -> int:
     """Export RTN data to SQLite database."""
-    data_dir = Path(args.data_dir)
-    data_dir.mkdir(exist_ok=True)
+    data_dir = args.output
+    data_dir.mkdir(parents=True, exist_ok=True)
 
     logger.info("Checking for latest RTN file...")
     filepath = download_latest_file(data_dir)
@@ -259,7 +259,7 @@ def cmd_export_sqlite(args: argparse.Namespace) -> int:
     logger.info(f"Reading all sheets from {filepath}...")
     results = read_all_sheets(filepath)
 
-    db_path = Path(args.output)
+    db_path = Path(args.save_as)
     if db_path.exists():
         db_path.unlink()
 
@@ -366,9 +366,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Fetch metadata HTML and generate metadata.json",
     )
     p_meta.add_argument(
-        "--dest",
-        default=str(DEFAULT_DATA_DIR),
-        help="Directory to write metadata.html and metadata.json",
+        "-o",
+        "--output",
+        type=Path,
+        default=DEFAULT_DATA_DIR,
+        help=f"Directory to write metadata.html and metadata.json (default: {DEFAULT_DATA_DIR})",
     )
     p_meta.add_argument("--encoding", default="utf-8", help="File encoding")
     p_meta.add_argument(
@@ -384,13 +386,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_dl.add_argument(
         "--metadata",
-        default=str(DEFAULT_DATA_DIR / "metadata.json"),
+        type=Path,
+        default=DEFAULT_DATA_DIR / "metadata.json",
         help="Input metadata JSON path",
     )
     p_dl.add_argument(
-        "--dest",
-        default=str(DEFAULT_DATA_DIR),
-        help="Destination root directory",
+        "-o",
+        "--output",
+        type=Path,
+        default=DEFAULT_DATA_DIR,
+        help=f"Destination root directory (default: {DEFAULT_DATA_DIR})",
     )
     p_dl.add_argument(
         "--encoding",
@@ -409,9 +414,11 @@ def build_parser() -> argparse.ArgumentParser:
         "latest", help="Download latest single file"
     )
     p_latest.add_argument(
-        "--dest",
-        default=str(DEFAULT_DATA_DIR),
-        help="Destination directory",
+        "-o",
+        "--output",
+        type=Path,
+        default=DEFAULT_DATA_DIR,
+        help=f"Destination directory (default: {DEFAULT_DATA_DIR})",
     )
     p_latest.set_defaults(func=cmd_latest)
 
@@ -422,14 +429,18 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_excel = export_sub.add_parser("excel", help="Export RTN data to Excel")
     p_excel.add_argument(
-        "--data-dir",
-        default=str(DEFAULT_DATA_DIR),
-        help="Directory containing RTN files",
+        "-o",
+        "--output",
+        type=Path,
+        default=DEFAULT_DATA_DIR,
+        help=f"Directory containing RTN files (default: {DEFAULT_DATA_DIR})",
     )
     p_excel.add_argument(
-        "--output",
-        default="rtn_processed.xlsx",
-        help="Output Excel file path",
+        "--save-as",
+        dest="save_as",
+        type=Path,
+        default=Path("rtn_processed.xlsx"),
+        help="Output Excel file path (default: rtn_processed.xlsx)",
     )
     p_excel.set_defaults(func=cmd_export_excel)
 
@@ -437,14 +448,18 @@ def build_parser() -> argparse.ArgumentParser:
         "sqlite", help="Export RTN data to SQLite"
     )
     p_sqlite.add_argument(
-        "--data-dir",
-        default=str(DEFAULT_DATA_DIR),
-        help="Directory containing RTN files",
+        "-o",
+        "--output",
+        type=Path,
+        default=DEFAULT_DATA_DIR,
+        help=f"Directory containing RTN files (default: {DEFAULT_DATA_DIR})",
     )
     p_sqlite.add_argument(
-        "--output",
-        default="rtn_data.db",
-        help="Output SQLite database path",
+        "--save-as",
+        dest="save_as",
+        type=Path,
+        default=Path("rtn_data.db"),
+        help="Output SQLite database path (default: rtn_data.db)",
     )
     p_sqlite.set_defaults(func=cmd_export_sqlite)
 
