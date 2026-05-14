@@ -30,6 +30,7 @@ dependencies = [
     "beautifulsoup4>=4.14.3",
     "openpyxl>=3.1.5",
     "quantilica-core @ git+https://github.com/Quantilica/quantilica-core.git",
+    "quantilica-io @ git+https://github.com/Quantilica/quantilica-io.git",
 ]
 
 [project.urls]

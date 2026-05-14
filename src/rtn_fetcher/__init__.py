@@ -34,6 +34,10 @@ from .account import expand_account_hierarchy, parse_account_name
 # Public API - DataFrame conversion (optional, requires pandas/polars)
 from .dataframe import to_pandas, to_polars
 
+# Public API - Parquet output with quantilica-io
+from .schema import build_contract
+from .writer import write_table_to_parquet
+
 __all__ = [
     # Version
     "__version__",
@@ -45,6 +49,7 @@ __all__ = [
     "read_sheet",
     "read_all_sheets",
     "write_table_to_csv",
+    "write_table_to_parquet",
     # Data extraction
     "extract_publication_metadata",
     "extract_sheet_rows",
@@ -55,4 +60,6 @@ __all__ = [
     # DataFrame conversion (optional)
     "to_pandas",
     "to_polars",
+    # Schema / contracts
+    "build_contract",
 ]
