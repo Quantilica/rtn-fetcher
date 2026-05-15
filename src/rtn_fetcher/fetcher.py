@@ -54,7 +54,7 @@ def download_latest_file(destination_dir: Path) -> Path:
     params = {"conteudo": "cdn"}
 
     with log_step(logger, "download-rtn-file"):
-        head = client.head(RTN_FILE_BASE_URL, params=params)
+        head = client.head_or_get(RTN_FILE_BASE_URL, params=params)
         last_modified_header = head.headers.get("Last-Modified")
         if not last_modified_header:
             raise ParseError("Response missing Last-Modified header")
