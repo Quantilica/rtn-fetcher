@@ -47,6 +47,7 @@ HEADER_FILL = PatternFill(fill_type="solid", fgColor="1F4E79")
 
 DATA_COLUMNS = ["key", "date", "value"]
 
+
 def get_hierarchy_columns(p_column_count: int) -> list[str]:
     """Build the hierarchy column headers based on the number of P_ columns."""
     return [
@@ -264,7 +265,9 @@ def cmd_export_excel(args: argparse.Namespace) -> int:
                 continue
             row_dict = dict(zip(acc_header, row, strict=False))
             account_code = row_dict.get("account_code")
-            p_values = [row_dict.get(f"P_{i}") for i in range(1, p_column_count + 1)]
+            p_values = [
+                row_dict.get(f"P_{i}") for i in range(1, p_column_count + 1)
+            ]
             for col_idx, value in enumerate(
                 [
                     f"{sheet_name}|{account_code}",
@@ -367,7 +370,9 @@ def cmd_export_sqlite(args: argparse.Namespace) -> int:
                 continue
             row_dict = dict(zip(acc_header, row, strict=False))
             account_code = row_dict.get("account_code")
-            p_values = [row_dict.get(f"P_{i}") for i in range(1, p_column_count + 1)]
+            p_values = [
+                row_dict.get(f"P_{i}") for i in range(1, p_column_count + 1)
+            ]
             # Pad with None to match the max_p_columns for consistency
             p_values.extend([None] * (max_p_columns - p_column_count))
             placeholders = ", ".join(["?"] * max_p_columns)
@@ -418,7 +423,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--output",
         type=Path,
         default=DEFAULT_DATA_DIR,
-        help=f"Directory to write metadata.html and metadata.json (default: {DEFAULT_DATA_DIR})",
+        help=f"Output directory for metadata (default: {DEFAULT_DATA_DIR})",
     )
     p_meta.add_argument("--encoding", default="utf-8", help="File encoding")
     p_meta.add_argument(

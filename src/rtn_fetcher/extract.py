@@ -15,13 +15,17 @@ from .account import (
     normalize_account_code,
     parse_account_name,
 )
-from .constants import HIERARCHY_SEPARATOR, MIN_ROW_CELLS, SPECIAL_ACCOUNT_MARKER
+from .constants import (
+    HIERARCHY_SEPARATOR,
+    MIN_ROW_CELLS,
+    SPECIAL_ACCOUNT_MARKER,
+)
 from .excel import Cell, Sheet, get_cell_indent
 from .table import Matrix, Tbl
 
 
 def deduplicate_account_rows(account_rows: list[list[Any]]) -> None:
-    """Make repeated account codes unique while preserving first occurrences."""
+    """Make repeated account codes unique preserving first occurrences."""
     seen: dict[str, int] = {}
 
     for index, account_code in enumerate(account_rows[0][1:], start=1):
@@ -215,7 +219,7 @@ def build_account_data_from_columns(
     last_code_parts = (0,)
     indent_stack = (0.0,)
 
-    for code_cell, name_cell in zip(code_cells, name_cells):
+    for code_cell, name_cell in zip(code_cells, name_cells, strict=False):
         current_indent = get_cell_indent(name_cell)
 
         if current_indent > indent_stack[-1]:

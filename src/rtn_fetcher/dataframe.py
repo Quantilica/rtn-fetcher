@@ -4,7 +4,7 @@ This module provides functions to convert Tbl objects to pandas DataFrames
 and polars DataFrames for seamless integration with data analysis workflows.
 """
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -43,7 +43,10 @@ def to_pandas(tbl: Tbl) -> "pd.DataFrame":
         ) from e
 
     header = tbl.get_header()
-    columns = {col_name: col_data[1:] for col_name, col_data in zip(header, tbl.data)}
+    columns = {
+        col_name: col_data[1:]
+        for col_name, col_data in zip(header, tbl.data, strict=False)
+    }
     return pd.DataFrame(columns)
 
 
@@ -77,5 +80,8 @@ def to_polars(tbl: Tbl) -> "pl.DataFrame":
         ) from e
 
     header = tbl.get_header()
-    columns = {col_name: col_data[1:] for col_name, col_data in zip(header, tbl.data)}
+    columns = {
+        col_name: col_data[1:]
+        for col_name, col_data in zip(header, tbl.data, strict=False)
+    }
     return pl.DataFrame(columns)

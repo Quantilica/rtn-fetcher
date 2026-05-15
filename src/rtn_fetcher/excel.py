@@ -10,7 +10,6 @@ from typing import Any
 import openpyxl
 from openpyxl.cell.cell import Cell
 from openpyxl.workbook.workbook import Workbook
-from openpyxl.worksheet.worksheet import Worksheet as Sheet
 
 
 def open_workbook(filepath: Path) -> Workbook:

@@ -35,8 +35,8 @@ def extract_account_column(data: Tbl) -> list[Any]:
 def clean_account_name(name: str) -> str:
     """Clean and normalize account name.
 
-    Removes multiple spaces, trailing numbers with slashes, and leading/trailing
-    hyphens and spaces.
+    Removes multiple spaces, trailing numbers with slashes, and
+    leading/trailing hyphens and spaces.
 
     Args:
         name: Raw account name.
@@ -59,7 +59,7 @@ def _looks_like_account_code(code: str) -> bool:
 
 
 def normalize_account_code(code: Any) -> str:
-    """Normalize an explicit account code to the package hierarchy separator."""
+    """Normalize account code to package hierarchy separator."""
     if code is None:
         return ""
 
@@ -98,8 +98,8 @@ def parse_account_name(name: str) -> tuple[str, str]:
         name: Combined account code and name string.
 
     Returns:
-        Tuple of (account_code, account_name) where account_code uses "=>"
-        as separator (e.g., "1=>2=>3") and account_name is the cleaned description.
+        Tuple of (account_code, account_name) where account_code uses
+        "=>" separator (e.g., "1=>2=>3") and account_name is cleaned.
 
     Examples:
         >>> parse_account_name("1.2.3 Receitas Correntes")
@@ -114,7 +114,9 @@ def parse_account_name(name: str) -> tuple[str, str]:
     if match and _looks_like_account_code(match.group(1)):
         account_code = match.group(1).strip()
 
-    account_name = clean_account_name(name[match.end() :] if account_code else name)
+    account_name = clean_account_name(
+        name[match.end() :] if account_code else name
+    )
     account_code = normalize_account_code(account_code)
 
     return account_code, account_name
@@ -128,11 +130,13 @@ def expand_account_hierarchy(accounts_data: Tbl) -> Tbl:
     the part names at each level.
 
     Args:
-        accounts_data: Table with columns [account_code, account_name, account_level].
+        accounts_data: Table with [account_code, account_name,
+            account_level] columns.
 
     Returns:
-        Table with expanded hierarchy: [account_code, account_name, account_level,
-        P_1, P_2, ..., P_N] where P_i contains the account part at level i.
+        Table with expanded hierarchy: [account_code, account_name,
+        account_level, P_1, P_2, ..., P_N] where P_i contains the
+        account part at level i.
 
     Examples:
         Input row: ('1=>2=>3', 'Despesas de Pessoal', 3)
@@ -158,10 +162,14 @@ def expand_account_hierarchy(accounts_data: Tbl) -> Tbl:
         if code_parts[0] == AUTO_ACCOUNT_PREFIX:
             full_account_name = account_name
         else:
-            full_account_name = f"{ACCOUNT_SEPARATOR.join(code_parts)} {account_name}"
+            full_account_name = (
+                f"{ACCOUNT_SEPARATOR.join(code_parts)} {account_name}"
+            )
 
         row_parts = (
-            last_parts[: level - 1] + [account_name] + [None] * (max_level - level)
+            last_parts[: level - 1]
+            + [account_name]
+            + [None] * (max_level - level)
         )
         row = [account_code, full_account_name, account_level, *row_parts]
 

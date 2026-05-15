@@ -1,7 +1,7 @@
 """RTN Excel file reader and data transformation.
 
-This module handles reading specific sheets from RTN Excel files and transforming
-them into normalized long-format tables.
+Handles reading specific sheets from RTN Excel files and transforming them
+into normalized long-format tables.
 """
 
 import csv
@@ -18,15 +18,15 @@ from .account import expand_account_hierarchy, extract_account_column
 from .constants import (
     ACCOUNT_COLUMN,
     DATE_COLUMN,
-    MISSING_VALUE_LABELS,
     MILLION_MULTIPLIER,
+    MISSING_VALUE_LABELS,
     MONTH_COLUMN,
     QUARTER_COLUMN,
     SHEET_CONFIGS,
     VALUE_COLUMN,
     YEAR_COLUMN,
 )
-from .excel import Sheet, open_workbook, cell_to_value
+from .excel import Sheet, cell_to_value, open_workbook
 from .extract import (
     build_account_data,
     build_account_data_from_columns,
@@ -35,7 +35,9 @@ from .table import Tbl, apply, get_header
 
 PeriodType = Literal["monthly", "yearly", "quarterly"]
 
-QUARTER_PATTERN = re.compile(r"^(?P<year>\d{4})-(?P<quarter>I|II|III|IV|[1-4])$")
+QUARTER_PATTERN = re.compile(
+    r"^(?P<year>\d{4})-(?P<quarter>I|II|III|IV|[1-4])$"
+)
 ROMAN_QUARTERS = {"I": 1, "II": 2, "III": 3, "IV": 4}
 
 
@@ -65,14 +67,16 @@ def convert_to_millions(value: Any) -> int | None:
 
 
 def convert_value(value: Any, multiplier: int = 1) -> int | float | str | None:
-    """Normalize spreadsheet values and apply the configured unit multiplier."""
+    """Normalize spreadsheet values and apply the unit multiplier."""
     if value is None:
         return None
 
     if isinstance(value, str):
         stripped = value.strip()
         folded = stripped.casefold()
-        if folded in MISSING_VALUE_LABELS or folded.startswith("n\u00e3o disp"):
+        if folded in MISSING_VALUE_LABELS or folded.startswith(
+            "n\u00e3o disp"
+        ):
             return None
         value = stripped
 
@@ -144,10 +148,10 @@ def parse_quarter(value: Any) -> tuple[int, int]:
 def is_period_value(value: Any, period: PeriodType) -> bool:
     """Return whether a cell value looks like a period header."""
     if period == "monthly":
-        return isinstance(value, (date, datetime))
+        return isinstance(value, date | datetime)
     if period == "yearly":
         return (
-            isinstance(value, (int, float))
+            isinstance(value, int | float)
             and not isinstance(value, bool)
             and float(value).is_integer()
             and 1900 <= int(value) <= 2200
@@ -157,19 +161,24 @@ def is_period_value(value: Any, period: PeriodType) -> bool:
     return False
 
 
-def find_header_row(sheet: Sheet, period: PeriodType, account_columns: int) -> int:
+def find_header_row(
+    sheet: Sheet, period: PeriodType, account_columns: int
+) -> int:
     """Find the row containing the period headers."""
     period_start_index = account_columns
 
     for row in sheet.iter_rows():
         values = [cell.value for cell in row]
         period_count = sum(
-            is_period_value(value, period) for value in values[period_start_index:]
+            is_period_value(value, period)
+            for value in values[period_start_index:]
         )
         if period_count >= 3:
             return row[0].row
 
-    raise ParseError(f"Could not find period header row in sheet '{sheet.title}'")
+    raise ParseError(
+        f"Could not find period header row in sheet '{sheet.title}'"
+    )
 
 
 def find_period_bounds(
@@ -190,7 +199,9 @@ def find_period_bounds(
             break
 
     if not period_columns:
-        raise ParseError(f"Could not find period columns in sheet '{sheet.title}'")
+        raise ParseError(
+            f"Could not find period columns in sheet '{sheet.title}'"
+        )
 
     return period_columns[0], period_columns[-1]
 
@@ -198,7 +209,9 @@ def find_period_bounds(
 def is_metadata_row(row: list[Any], account_columns: int) -> bool:
     """Identify note/source/section-header rows that are not observations."""
     account_values = [cell.value for cell in row[:account_columns]]
-    account_text = " ".join(str(value).strip() for value in account_values if value)
+    account_text = " ".join(
+        str(value).strip() for value in account_values if value
+    )
     account_text_lower = account_text.casefold()
 
     if not account_text:
@@ -229,7 +242,10 @@ def extract_data_rows(
     )
 
     rows = [
-        [sheet.cell(header_row, column) for column in range(1, last_period_col + 1)]
+        [
+            sheet.cell(header_row, column)
+            for column in range(1, last_period_col + 1)
+        ]
     ]
 
     for row_index in range(header_row + 1, sheet.max_row + 1):
@@ -264,7 +280,7 @@ def build_wide_table(
     rows: list[list[Any]],
     account_columns: int,
 ) -> tuple[Tbl, Tbl]:
-    """Build a wide table and account hierarchy from extracted worksheet rows."""
+    """Build a wide table and account hierarchy from worksheet rows."""
     if account_columns == 1:
         raw_data = Tbl(rows)
         raw_data.data[0][0] = DATE_COLUMN
@@ -273,7 +289,9 @@ def build_wide_table(
         accounts_data = build_account_data(account_cells)
 
         account_codes = accounts_data["account_code"][1:]
-        for column, account_code in zip(raw_data.data[1:], account_codes):
+        for column, account_code in zip(
+            raw_data.data[1:], account_codes, strict=False
+        ):
             column[0] = account_code
 
         return raw_data, expand_account_hierarchy(accounts_data)
@@ -287,7 +305,9 @@ def build_wide_table(
         name_cells=[row[1] for row in data_rows],
     )
 
-    for row, account_code in zip(data_rows, accounts_data["account_code"][1:]):
+    for row, account_code in zip(
+        data_rows, accounts_data["account_code"][1:], strict=False
+    ):
         raw_columns.append([account_code, *row[account_columns:]])
 
     return Tbl(raw_columns), expand_account_hierarchy(accounts_data)
@@ -316,7 +336,9 @@ def read_sheet_data(
         Tuple of (data_table, account_hierarchy_table).
     """
     # Extract raw data and build account hierarchy
-    rows = extract_data_rows(sheet, period=period, account_columns=account_columns)
+    rows = extract_data_rows(
+        sheet, period=period, account_columns=account_columns
+    )
     raw_data, account_hierarchy = build_wide_table(rows, account_columns)
 
     # Convert Cell objects to values
@@ -342,9 +364,13 @@ def read_sheet(filepath: Path, sheet_name: str) -> tuple[Tbl, Tbl]:
     """Read a specific sheet from RTN Excel file."""
     if sheet_name not in SHEET_CONFIGS:
         available_sheets = ", ".join(SHEET_CONFIGS.keys())
-        raise ParseError(f"Unknown sheet '{sheet_name}'. Available: {available_sheets}")
+        raise ParseError(
+            f"Unknown sheet '{sheet_name}'. Available: {available_sheets}"
+        )
 
-    with log_step(logger, "read-rtn-sheet", filepath=filepath.name, sheet=sheet_name):
+    with log_step(
+        logger, "read-rtn-sheet", filepath=filepath.name, sheet=sheet_name
+    ):
         workbook = open_workbook(filepath)
         return read_workbook_sheet(workbook, sheet_name)
 
@@ -383,7 +409,7 @@ def _normalize_index_code(code: str) -> str:
 
 
 def _read_index_titles(workbook: Any) -> dict[str, str]:
-    """Read human-readable sheet titles from an open workbook's Índice sheet."""
+    """Read sheet titles from workbook's Índice sheet."""
     index_sheet_name = next(
         (name for name in workbook.sheetnames if "ndice" in name), None
     )
@@ -412,7 +438,8 @@ def read_all_sheets(filepath: Path) -> dict[str, tuple[Tbl, Tbl, str | None]]:
         filepath: Path to the Excel file.
 
     Returns:
-        Dictionary mapping sheet names to (data_table, account_hierarchy_table, title) tuples.
+        Dictionary mapping sheet names to (data_table, hierarchy_table, title)
+        tuples.
     """
     workbook = open_workbook(filepath)
     titles = _read_index_titles(workbook)

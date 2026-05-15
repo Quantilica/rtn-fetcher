@@ -4,7 +4,8 @@ This module provides a column-oriented table structure (Tbl) and associated
 transformation functions for working with tabular data.
 """
 
-from typing import TYPE_CHECKING, Any, Callable, Iterator
+from collections.abc import Callable, Iterator
+from typing import TYPE_CHECKING, Any
 
 from .constants import MAX_DISPLAY_ROWS
 
@@ -23,9 +24,9 @@ class Tbl:
     The first element of each column is the column name (header).
 
     Attributes:
-        data: List of columns, each column is a list starting with the column name.
+        data: List of columns, each column starts with the column name.
         ncols: Number of columns in the table.
-        nrows: Number of rows in the table (including header).
+        nrows: Number of rows (including header).
     """
 
     def __init__(self, data: Matrix | None = None) -> None:
@@ -168,12 +169,14 @@ class Tbl:
         try:
             import pandas as pd
         except ImportError as e:
-            raise ImportError(
-                "pandas is required. Install with: pip install rtn-fetcher[pandas]"
-            ) from e
+            msg = "pandas required: pip install rtn-fetcher[pandas]"
+            raise ImportError(msg) from e
 
         header = self.get_header()
-        columns = {col_name: col_data[1:] for col_name, col_data in zip(header, self.data)}
+        columns = {
+            col_name: col_data[1:]
+            for col_name, col_data in zip(header, self.data, strict=False)
+        }
         return pd.DataFrame(columns)
 
     def to_polars(self) -> "pl.DataFrame":
@@ -190,12 +193,14 @@ class Tbl:
         try:
             import polars as pl
         except ImportError as e:
-            raise ImportError(
-                "polars is required. Install with: pip install rtn-fetcher[polars]"
-            ) from e
+            msg = "polars required: pip install rtn-fetcher[polars]"
+            raise ImportError(msg) from e
 
         header = self.get_header()
-        columns = {col_name: col_data[1:] for col_name, col_data in zip(header, self.data)}
+        columns = {
+            col_name: col_data[1:]
+            for col_name, col_data in zip(header, self.data, strict=False)
+        }
         return pl.DataFrame(columns)
 
 
@@ -220,7 +225,7 @@ def iter_rows(data: Matrix) -> Iterator[list[Any]]:
     Yields:
         Each row as a list.
     """
-    for row in zip(*data):
+    for row in zip(*data, strict=False):
         yield list(row)
 
 
@@ -233,7 +238,7 @@ def transpose(data: Matrix) -> Matrix:
     Returns:
         Transposed matrix.
     """
-    return [[*row] for row in zip(*data)]
+    return [[*row] for row in zip(*data, strict=False)]
 
 
 def melt(
