@@ -46,15 +46,18 @@ HEADER_FONT = Font(bold=True, color="FFFFFF")
 HEADER_FILL = PatternFill(fill_type="solid", fgColor="1F4E79")
 
 DATA_COLUMNS = ["key", "date", "value"]
-HIERARCHY_COLUMNS = [
-    "key",
-    "sheet",
-    "sheet_title",
-    "account_code",
-    "account_name",
-    "account_level",
-    *(f"P_{i}" for i in range(1, 11)),
-]
+
+def get_hierarchy_columns(p_column_count: int) -> list[str]:
+    """Build the hierarchy column headers based on the number of P_ columns."""
+    return [
+        "key",
+        "sheet",
+        "sheet_title",
+        "account_code",
+        "account_name",
+        "account_level",
+        *(f"P_{i}" for i in range(1, p_column_count + 1)),
+    ]
 
 
 def make_period_date(year, month, quarter) -> date | None:
@@ -76,6 +79,17 @@ def write_header(ws, columns: list[str]) -> None:
 
 def get_column_names(table: Tbl) -> list[str]:
     return [col[0] for col in table.data]
+
+
+def get_p_column_count(columns: list[str]) -> int:
+    """Count how many P_i hierarchy columns exist in the column list."""
+    count = 0
+    for i in range(1, 11):
+        if f"P_{i}" in columns:
+            count += 1
+        else:
+            break
+    return count
 
 
 def cmd_metadata(args: argparse.Namespace) -> int:
@@ -200,6 +214,13 @@ def cmd_export_excel(args: argparse.Namespace) -> int:
     logger.info(f"Reading all sheets from {filepath}...")
     results = read_all_sheets(filepath)
 
+    # Detect max hierarchy depth across all sheets
+    max_p_columns = 0
+    for _, (_, accounts_tbl, _) in results.items():
+        acc_header = get_column_names(accounts_tbl)
+        p_count = get_p_column_count(acc_header)
+        max_p_columns = max(max_p_columns, p_count)
+
     output_path = Path(args.save_as)
     wb = Workbook()
     wb.remove(wb.active)
@@ -209,7 +230,8 @@ def cmd_export_excel(args: argparse.Namespace) -> int:
     data_row = 2
 
     ws_acc = wb.create_sheet(title="rtn_accounts")
-    write_header(ws_acc, HIERARCHY_COLUMNS)
+    hierarchy_columns = get_hierarchy_columns(max_p_columns)
+    write_header(ws_acc, hierarchy_columns)
     acc_row = 2
 
     for sheet_name, (data_tbl, accounts_tbl, sheet_title) in results.items():
@@ -236,12 +258,13 @@ def cmd_export_excel(args: argparse.Namespace) -> int:
             data_row += 1
 
         acc_header = get_column_names(accounts_tbl)
+        p_column_count = get_p_column_count(acc_header)
         for row in accounts_tbl.iter_rows():
             if row == acc_header:
                 continue
             row_dict = dict(zip(acc_header, row, strict=False))
             account_code = row_dict.get("account_code")
-            p_values = [row_dict.get(f"P_{i}") for i in range(1, 11)]
+            p_values = [row_dict.get(f"P_{i}") for i in range(1, p_column_count + 1)]
             for col_idx, value in enumerate(
                 [
                     f"{sheet_name}|{account_code}",
@@ -291,7 +314,14 @@ def cmd_export_sqlite(args: argparse.Namespace) -> int:
     """
     )
 
-    hierarchy_cols = [f"P_{i}" for i in range(1, 11)]
+    # Detect max hierarchy depth across all sheets
+    max_p_columns = 0
+    for _, (_, accounts_tbl, _) in results.items():
+        acc_header = get_column_names(accounts_tbl)
+        p_count = get_p_column_count(acc_header)
+        max_p_columns = max(max_p_columns, p_count)
+
+    hierarchy_cols = [f"P_{i}" for i in range(1, max_p_columns + 1)]
     cols_sql = ", ".join(f"{col} TEXT" for col in hierarchy_cols)
     cursor.execute(
         f"""
@@ -331,13 +361,16 @@ def cmd_export_sqlite(args: argparse.Namespace) -> int:
             )
 
         acc_header = get_column_names(accounts_tbl)
+        p_column_count = get_p_column_count(acc_header)
         for row in accounts_tbl.iter_rows():
             if row == acc_header:
                 continue
             row_dict = dict(zip(acc_header, row, strict=False))
             account_code = row_dict.get("account_code")
-            p_values = [row_dict.get(f"P_{i}") for i in range(1, 11)]
-            placeholders = ", ".join(["?"] * 10)
+            p_values = [row_dict.get(f"P_{i}") for i in range(1, p_column_count + 1)]
+            # Pad with None to match the max_p_columns for consistency
+            p_values.extend([None] * (max_p_columns - p_column_count))
+            placeholders = ", ".join(["?"] * max_p_columns)
             cursor.execute(
                 f"INSERT INTO rtn_accounts (key, sheet, sheet_title, "
                 f"account_code, account_name, account_level, "
