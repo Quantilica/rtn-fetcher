@@ -11,9 +11,8 @@ from pathlib import Path
 from typing import Any, Literal
 
 from quantilica_core.exceptions import ParseError
-from quantilica_core.logging import log_step
+from quantilica_core.logging import get_logger, log_step
 
-from . import logger
 from .account import expand_account_hierarchy, extract_account_column
 from .constants import (
     ACCOUNT_COLUMN,
@@ -32,6 +31,8 @@ from .extract import (
     build_account_data_from_columns,
 )
 from .table import Tbl, apply, get_header
+
+logger = get_logger(__name__)
 
 PeriodType = Literal["monthly", "yearly", "quarterly"]
 

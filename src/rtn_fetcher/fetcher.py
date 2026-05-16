@@ -12,16 +12,16 @@ from bs4 import BeautifulSoup
 from quantilica_core.exceptions import ParseError
 from quantilica_core.files import write_bytes_atomic, write_text_atomic
 from quantilica_core.http import AsyncHttpClient, HttpClient
-from quantilica_core.logging import log_step
+from quantilica_core.logging import get_logger, log_step
 from quantilica_core.storage import stamp_filename
 
-from . import logger
 from .constants import (
     HTTP_DATE_FORMAT,
     RTN_API_BASE_URL,
     RTN_FILE_BASE_URL,
 )
 
+logger = get_logger(__name__)
 client = HttpClient(timeout=60.0)
 
 SOURCE_ID = "tesouro-nacional"
