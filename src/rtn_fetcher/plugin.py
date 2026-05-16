@@ -30,7 +30,7 @@ from rtn_fetcher.cli import (
     write_header,
 )
 
-app = typer.Typer(help="Relatório de Transferências da União (RTN).")
+app = typer.Typer(help="Resultado do Tesouro Nacional (RTN).")
 fetch_sub = typer.Typer(help="Buscar metadados e baixar arquivos RTN.")
 export_sub = typer.Typer(help="Exportar dados RTN para diferentes formatos.")
 app.add_typer(fetch_sub, name="fetch")
