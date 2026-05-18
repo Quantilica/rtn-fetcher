@@ -28,7 +28,6 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill
 from quantilica_core.http import BROWSER_HEADERS, AsyncHttpClient
 from quantilica_core.logging import configure_cli_logging
-from quantilica_core.progress import batch_progress
 
 from rtn_fetcher import (
     Tbl,
@@ -127,7 +126,7 @@ async def _bounded_download(
     dest_root: Path,
     encoding: str,
     semaphore: asyncio.Semaphore,
-    pbar=None,
+    state: dict,
 ) -> None:
     """Download one publication link, gated by ``semaphore``."""
     ano = pub.get("ano_publicacao")
@@ -137,25 +136,25 @@ async def _bounded_download(
 
     dest_file = dest_dir / filename
     if dest_file.exists():
-        if pbar is not None:
-            pbar.update(1)
+        state["count"] += 1
+        logger.info(f"[{state['count']}/{state['total']}] Skipped {filename} (already exists)")
         return
 
-    logger.info(f"Downloading {url} -> {dest_file}")
     async with semaphore:
+        state["count"] += 1
+        current = state["count"]
+        logger.info(f"[{current}/{state['total']}] Downloading {filename}...")
         try:
             await download_publication_link(
                 client, url, dest_file, text_encoding=encoding
             )
         except Exception as exc:
-            logger.error(f"Failed to download {url}: {exc}")
-    if pbar is not None:
-        pbar.update(1)
+            logger.error(f"[{current}/{state['total']}] Failed to download {url}: {exc}")
 
 
 def cmd_download(args: argparse.Namespace) -> int:
     """Download files referenced in metadata.json."""
-    metadata_path = Path(args.metadata)
+    metadata_path = args.output / "metadata.json"
     if not metadata_path.exists():
         logger.error(f"Metadata file not found: {metadata_path}")
         return 2
@@ -163,10 +162,10 @@ def cmd_download(args: argparse.Namespace) -> int:
     with metadata_path.open("r", encoding=args.encoding) as f:
         publications = json.load(f)
 
-    show_progress = not args.verbose
     total = sum(len(pub.get("links", {})) for pub in publications)
+    state = {"count": 0, "total": total}
 
-    async def _run_async_downloads(pbar) -> None:
+    async def _run_async_downloads() -> None:
         semaphore = asyncio.Semaphore(args.concurrency)
         client = AsyncHttpClient(timeout=600.0, headers=BROWSER_HEADERS)
         tasks = [
@@ -178,7 +177,7 @@ def cmd_download(args: argparse.Namespace) -> int:
                 args.output,
                 args.encoding,
                 semaphore,
-                pbar,
+                state,
             )
             for pub in publications
             for filename, url in pub.get("links", {}).items()
@@ -186,11 +185,7 @@ def cmd_download(args: argparse.Namespace) -> int:
         if tasks:
             await asyncio.gather(*tasks)
 
-    if show_progress and total > 0:
-        with batch_progress("rtn-download", total=total) as pbar:
-            asyncio.run(_run_async_downloads(pbar))
-    else:
-        asyncio.run(_run_async_downloads(None))
+    asyncio.run(_run_async_downloads())
     return 0
 
 
@@ -407,7 +402,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--verbose",
         action="store_true",
         default=False,
-        help="Exibir logs detalhados em vez de barra de progresso",
+        help="Exibir logs detalhados (DEBUG)",
     )
     sub = parser.add_subparsers(dest="group", required=True)
 
@@ -436,12 +431,6 @@ def build_parser() -> argparse.ArgumentParser:
     p_dl = fetch_sub.add_parser(
         "download",
         help="Download files referenced in metadata.json",
-    )
-    p_dl.add_argument(
-        "--metadata",
-        type=Path,
-        default=DEFAULT_DATA_DIR / "metadata.json",
-        help="Input metadata JSON path",
     )
     p_dl.add_argument(
         "-o",
@@ -523,8 +512,6 @@ def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
     configure_cli_logging(verbose=args.verbose)
-    if not args.verbose:
-        logging.getLogger("rtn_fetcher").setLevel(logging.WARNING)
     return args.func(args)
 
 
