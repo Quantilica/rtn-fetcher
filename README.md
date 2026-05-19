@@ -236,11 +236,14 @@ rtn-fetcher --version
 rtn-fetcher sync
 
 # Baixar apenas o arquivo da série histórica mais recente
-rtn-fetcher latest
+rtn-fetcher sync --latest
 
 # Exportar dados para outros formatos
 rtn-fetcher export excel
 rtn-fetcher export sqlite
+
+# Pipeline completo (sync -> export)
+rtn-fetcher pipeline --format excel
 ```
 
 ### Opções do `sync`
@@ -253,6 +256,7 @@ rtn-fetcher sync --force                   # Refaz o fetch de metadados mesmo se
 rtn-fetcher sync --concurrency 8           # Até 8 downloads simultâneos
 rtn-fetcher sync --dry-run                 # Lista os arquivos sem baixar
 rtn-fetcher sync --metadata metadata.json  # Usa JSON de metadados existente
+rtn-fetcher sync --latest                  # Apenas a série histórica mais recente
 rtn-fetcher --verbose sync                 # Exibe logs detalhados
 ```
 
@@ -276,9 +280,10 @@ Quando instalado junto com `quantilica-cli`, o rtn-fetcher é descoberto automat
 
 ```bash
 quantilica fetch rtn sync
-quantilica fetch rtn latest
+quantilica fetch rtn sync --latest
 quantilica fetch rtn export excel
 quantilica fetch rtn export sqlite
+quantilica fetch rtn pipeline --format sqlite
 ```
 
 ## API Reference

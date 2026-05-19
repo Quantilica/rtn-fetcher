@@ -164,6 +164,11 @@ def cmd_download(args: argparse.Namespace) -> None:
     dest = args.output
     dest.mkdir(parents=True, exist_ok=True)
 
+    if getattr(args, "latest", False):
+        filepath = download_latest_file(dest)
+        logger.info(f"Latest RTN file: {filepath}")
+        return
+
     publications = _load_publications(dest, args.metadata, args.force)
     total = sum(len(pub.get("links", {})) for pub in publications)
     ok = failed = skipped = 0
@@ -202,12 +207,26 @@ def cmd_download(args: argparse.Namespace) -> None:
     asyncio.run(_run_async_downloads())
 
 
-def cmd_latest(args: argparse.Namespace) -> None:
-    """Download latest single file."""
-    dest = args.output
-    dest.mkdir(parents=True, exist_ok=True)
-    filepath = download_latest_file(dest)
-    logger.info(f"Latest RTN file: {filepath}")
+def cmd_pipeline(args: argparse.Namespace) -> None:
+    """Run the full RTN pipeline: sync then export."""
+    if args.format not in ("excel", "sqlite"):
+        print(
+            f"Erro: formato inválido '{args.format}' (use excel ou sqlite)",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    logger.info("=== Passo 1/2: sincronização ===")
+    args.latest = False
+    cmd_download(args)
+    logger.info("=== Passo 2/2: exportação ===")
+    if args.format == "excel":
+        if args.save_as is None:
+            args.save_as = Path("rtn_processed.xlsx")
+        cmd_export_excel(args)
+    else:
+        if args.save_as is None:
+            args.save_as = Path("rtn_data.db")
+        cmd_export_sqlite(args)
 
 
 def cmd_export_excel(args: argparse.Namespace) -> None:
@@ -450,20 +469,56 @@ def get_parser() -> argparse.ArgumentParser:
         default=4,
         help="Downloads simultâneos (padrão: 4)",
     )
+    p_dl.add_argument(
+        "--latest",
+        action="store_true",
+        help="Baixar apenas a série histórica RTN mais recente",
+    )
     p_dl.set_defaults(func=cmd_download)
 
-    p_latest = sub.add_parser(
-        "latest",
-        help="Baixar o arquivo da série histórica RTN mais recente",
+    p_pipeline = sub.add_parser(
+        "pipeline",
+        help="Pipeline completo RTN (sync -> export)",
     )
-    p_latest.add_argument(
+    p_pipeline.add_argument(
         "-o",
         "--output",
         type=Path,
         default=DEFAULT_DATA_DIR,
         help=f"Diretório de destino (padrão: {DEFAULT_DATA_DIR})",
     )
-    p_latest.set_defaults(func=cmd_latest)
+    p_pipeline.add_argument(
+        "--format",
+        choices=["excel", "sqlite"],
+        default="excel",
+        help="Formato de exportação (padrão: excel)",
+    )
+    p_pipeline.add_argument(
+        "--save-as",
+        dest="save_as",
+        type=Path,
+        default=None,
+        help="Arquivo de saída da exportação",
+    )
+    p_pipeline.add_argument(
+        "--metadata",
+        type=Path,
+        default=None,
+        metavar="FILE",
+        help="JSON de metadados existente (dispensa busca online)",
+    )
+    p_pipeline.add_argument(
+        "--force",
+        action="store_true",
+        help="Rebaixar metadados mesmo se já existirem",
+    )
+    p_pipeline.add_argument(
+        "--concurrency",
+        type=int,
+        default=4,
+        help="Downloads simultâneos (padrão: 4)",
+    )
+    p_pipeline.set_defaults(func=cmd_pipeline)
 
     p_export = sub.add_parser(
         "export",
