@@ -136,12 +136,15 @@ rtn-fetcher export excel
 # Exportar para banco de dados SQLite
 rtn-fetcher export sqlite
 
-# Customizar caminhos de entrada/saída
-rtn-fetcher export excel --data-dir data --output meus_dados.xlsx
-rtn-fetcher export sqlite --data-dir data --output meus_dados.db
+# Customizar caminho de saída
+rtn-fetcher export excel --save-as meus_dados.xlsx
+rtn-fetcher export sqlite --save-as meus_dados.db
+
+# Usar arquivo local já baixado (sem nova requisição de rede)
+rtn-fetcher export excel --file rtn@20250101T120000.xlsx --save-as meus_dados.xlsx
 ```
 
-Ambos comandos baixam a planilha mais recente e exportam automaticamente com hierarquia de contas.
+Ambos os comandos baixam automaticamente a planilha mais recente se nenhum `--file` for especificado.
 
 ## Funcionalidades
 
@@ -223,35 +226,59 @@ account_code  account_name                account_level  P_1       P_2
 
 ## Interface de Linha de Comando (CLI)
 
-Use o comando `rtn-fetcher` para operações de download e exportação:
+Use o comando `rtn-fetcher` para operações de sincronização e exportação:
 
 ```bash
-# Ver ajuda geral
 rtn-fetcher --help
+rtn-fetcher --version
 
-# Operações de fetch
-rtn-fetcher fetch metadata          # Busca metadados e cria metadata.json
-rtn-fetcher fetch download          # Baixa arquivos listados em metadata.json
-rtn-fetcher fetch latest            # Baixa o arquivo RTN mais recente
+# Sincronizar todas as publicações RTN (metadados + arquivos)
+rtn-fetcher sync
 
-# Operações de export
-rtn-fetcher export excel            # Exporta para Excel com formatação
-rtn-fetcher export sqlite           # Exporta para banco SQLite
+# Baixar apenas o arquivo da série histórica mais recente
+rtn-fetcher latest
+
+# Exportar dados para outros formatos
+rtn-fetcher export excel
+rtn-fetcher export sqlite
 ```
 
-### Opções de Fetch
+### Opções do `sync`
+
+O comando `sync` busca metadados da página de publicações do Tesouro Nacional, identifica os links de download e baixa todos os arquivos ainda não presentes no diretório local. Os metadados são cacheados localmente; use `--force` para atualizá-los.
 
 ```bash
-rtn-fetcher fetch metadata --dest data --force        # Refaz download mesmo se existe
-rtn-fetcher fetch download --metadata data/metadata.json --concurrency 8
-rtn-fetcher fetch latest --dest data
+rtn-fetcher sync -o /data/rtn              # Diretório de destino
+rtn-fetcher sync --force                   # Refaz o fetch de metadados mesmo se já existe
+rtn-fetcher sync --concurrency 8           # Até 8 downloads simultâneos
+rtn-fetcher sync --dry-run                 # Lista os arquivos sem baixar
+rtn-fetcher sync --metadata metadata.json  # Usa JSON de metadados existente
+rtn-fetcher --verbose sync                 # Exibe logs detalhados
 ```
 
-### Opções de Export
+### Opções do `export`
 
 ```bash
-rtn-fetcher export excel --data-dir data --output rtn_dados.xlsx
-rtn-fetcher export sqlite --data-dir data --output rtn_dados.db
+rtn-fetcher export excel --save-as rtn_dados.xlsx
+rtn-fetcher export sqlite --save-as rtn_dados.db
+
+# Usar arquivo local já baixado (sem nova requisição de rede)
+rtn-fetcher export excel --file rtn@20250101T120000.xlsx --save-as rtn_dados.xlsx
+rtn-fetcher export sqlite --file rtn@20250101T120000.xlsx --save-as rtn_dados.db
+
+# Sobrescrever banco SQLite existente sem confirmação
+rtn-fetcher export sqlite --save-as rtn_dados.db --force
+```
+
+### Integração com `quantilica-cli`
+
+Quando instalado junto com `quantilica-cli`, o rtn-fetcher é descoberto automaticamente via entry point e montado no hub unificado:
+
+```bash
+quantilica fetch rtn sync
+quantilica fetch rtn latest
+quantilica fetch rtn export excel
+quantilica fetch rtn export sqlite
 ```
 
 ## API Reference
