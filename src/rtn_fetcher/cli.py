@@ -1,14 +1,9 @@
 #!/usr/bin/env python3
 """Unified CLI tool for RTN data fetching and export operations.
 
-Provides these subcommand groups:
-- fetch: metadata, download, latest
-- export: excel, sqlite
-
 Usage examples:
-  rtn-fetcher fetch metadata
-  rtn-fetcher fetch download
-  rtn-fetcher fetch latest
+  rtn-fetcher download
+  rtn-fetcher latest
   rtn-fetcher export excel
   rtn-fetcher export sqlite
 """
@@ -18,8 +13,9 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
-import logging
 import sqlite3
+import sys
+from collections.abc import Callable
 from datetime import date
 from pathlib import Path
 
@@ -31,6 +27,7 @@ from quantilica_core.logging import configure_cli_logging
 
 from rtn_fetcher import (
     Tbl,
+    __version__,
     download_latest_file,
     extract_publication_metadata,
     fetch_publications_metadata,
@@ -92,32 +89,6 @@ def get_p_column_count(columns: list[str]) -> int:
     return count
 
 
-def cmd_metadata(args: argparse.Namespace) -> int:
-    """Fetch metadata HTML and generate metadata.json."""
-    dest = args.output
-    out_html = dest / "metadata.html"
-    out_json = dest / "metadata.json"
-
-    if out_html.exists() and not args.force:
-        with out_html.open("r", encoding=args.encoding) as f:
-            metadata_html = f.read()
-    else:
-        metadata_html = fetch_publications_metadata()
-        out_html.parent.mkdir(parents=True, exist_ok=True)
-        with out_html.open("w", encoding=args.encoding) as f:
-            f.write(metadata_html)
-
-    soup = BeautifulSoup(metadata_html, "html.parser")
-    publications = extract_publication_metadata(soup)
-
-    out_json.parent.mkdir(parents=True, exist_ok=True)
-    with out_json.open("w", encoding=args.encoding) as f:
-        json.dump(publications, f, ensure_ascii=False, indent=2)
-
-    logger.info(f"Saved {len(publications)} publications to {out_json}")
-    return 0
-
-
 async def _bounded_download(
     pub: dict,
     filename: str,
@@ -126,7 +97,8 @@ async def _bounded_download(
     dest_root: Path,
     encoding: str,
     semaphore: asyncio.Semaphore,
-    state: dict,
+    *,
+    on_done: Callable[[str, str], None] | None = None,
 ) -> None:
     """Download one publication link, gated by ``semaphore``."""
     ano = pub.get("ano_publicacao")
@@ -136,34 +108,76 @@ async def _bounded_download(
 
     dest_file = dest_dir / filename
     if dest_file.exists():
-        state["count"] += 1
-        logger.info(f"[{state['count']}/{state['total']}] Skipped {filename} (already exists)")
+        logger.debug(f"Skipped {filename} (already exists)")
+        if on_done is not None:
+            on_done(filename, "skipped")
         return
 
     async with semaphore:
-        state["count"] += 1
-        current = state["count"]
-        logger.info(f"[{current}/{state['total']}] Downloading {filename}...")
+        logger.debug(f"Downloading {filename}...")
         try:
             await download_publication_link(
                 client, url, dest_file, text_encoding=encoding
             )
+            if on_done is not None:
+                on_done(filename, "ok")
         except Exception as exc:
-            logger.error(f"[{current}/{state['total']}] Failed to download {url}: {exc}")
+            logger.error(f"Failed to download {url}: {exc}")
+            if on_done is not None:
+                on_done(filename, "failed")
 
 
-def cmd_download(args: argparse.Namespace) -> int:
-    """Download files referenced in metadata.json."""
-    metadata_path = args.output / "metadata.json"
-    if not metadata_path.exists():
-        logger.error(f"Metadata file not found: {metadata_path}")
-        return 2
+def _load_publications(
+    dest: Path, metadata_path: Path | None, force: bool
+) -> list[dict]:
+    """Fetch or load RTN publication metadata, caching HTML to disk."""
+    if metadata_path is not None:
+        if not metadata_path.exists():
+            print(
+                f"Erro: metadados não encontrados: {metadata_path}",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        with metadata_path.open("r", encoding="utf-8") as f:
+            return json.load(f)
 
-    with metadata_path.open("r", encoding=args.encoding) as f:
-        publications = json.load(f)
+    out_html = dest / "metadata.html"
+    if out_html.exists() and not force:
+        logger.info("Using cached metadata.")
+        with out_html.open("r", encoding="utf-8") as f:
+            metadata_html = f.read()
+    else:
+        logger.info("Fetching RTN metadata...")
+        metadata_html = fetch_publications_metadata()
+        out_html.parent.mkdir(parents=True, exist_ok=True)
+        with out_html.open("w", encoding="utf-8") as f:
+            f.write(metadata_html)
 
+    soup = BeautifulSoup(metadata_html, "html.parser")
+    publications = extract_publication_metadata(soup)
+    logger.info(f"Found {len(publications)} publications.")
+    return publications
+
+
+def cmd_download(args: argparse.Namespace) -> None:
+    """Fetch metadata and download all RTN publication files."""
+    dest = args.output
+    dest.mkdir(parents=True, exist_ok=True)
+
+    publications = _load_publications(dest, args.metadata, args.force)
     total = sum(len(pub.get("links", {})) for pub in publications)
-    state = {"count": 0, "total": total}
+    ok = failed = skipped = 0
+
+    def on_done(filename: str, result: str) -> None:
+        nonlocal ok, failed, skipped
+        if result == "ok":
+            ok += 1
+        elif result == "skipped":
+            skipped += 1
+        else:
+            failed += 1
+        count = ok + failed + skipped
+        logger.info("[%d/%d] %s (%s)", count, total, filename, result)
 
     async def _run_async_downloads() -> None:
         semaphore = asyncio.Semaphore(args.concurrency)
@@ -174,10 +188,10 @@ def cmd_download(args: argparse.Namespace) -> int:
                 filename,
                 url,
                 client,
-                args.output,
-                args.encoding,
+                dest,
+                "utf-8",
                 semaphore,
-                state,
+                on_done=on_done,
             )
             for pub in publications
             for filename, url in pub.get("links", {}).items()
@@ -186,19 +200,17 @@ def cmd_download(args: argparse.Namespace) -> int:
             await asyncio.gather(*tasks)
 
     asyncio.run(_run_async_downloads())
-    return 0
 
 
-def cmd_latest(args: argparse.Namespace) -> int:
+def cmd_latest(args: argparse.Namespace) -> None:
     """Download latest single file."""
     dest = args.output
     dest.mkdir(parents=True, exist_ok=True)
     filepath = download_latest_file(dest)
     logger.info(f"Latest RTN file: {filepath}")
-    return 0
 
 
-def cmd_export_excel(args: argparse.Namespace) -> int:
+def cmd_export_excel(args: argparse.Namespace) -> None:
     """Export RTN data to Excel."""
     data_dir = args.output
     data_dir.mkdir(parents=True, exist_ok=True)
@@ -280,10 +292,9 @@ def cmd_export_excel(args: argparse.Namespace) -> int:
 
     wb.save(output_path)
     logger.info(f"Saved to {output_path}")
-    return 0
 
 
-def cmd_export_sqlite(args: argparse.Namespace) -> int:
+def cmd_export_sqlite(args: argparse.Namespace) -> None:
     """Export RTN data to SQLite database."""
     data_dir = args.output
     data_dir.mkdir(parents=True, exist_ok=True)
@@ -390,13 +401,17 @@ def cmd_export_sqlite(args: argparse.Namespace) -> int:
     conn.commit()
     conn.close()
     logger.info(f"Database saved to {db_path}")
-    return 0
 
 
-def build_parser() -> argparse.ArgumentParser:
+def get_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="rtn-fetcher",
         description="RTN data helper CLI - fetch and export utilities",
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
     )
     parser.add_argument(
         "--verbose",
@@ -404,116 +419,101 @@ def build_parser() -> argparse.ArgumentParser:
         default=False,
         help="Exibir logs detalhados (DEBUG)",
     )
-    sub = parser.add_subparsers(dest="group", required=True)
+    sub = parser.add_subparsers(dest="command", required=True)
 
-    p_fetch = sub.add_parser("fetch", help="Fetch metadata and download files")
-    fetch_sub = p_fetch.add_subparsers(dest="command", required=True)
-
-    p_meta = fetch_sub.add_parser(
-        "metadata",
-        help="Fetch metadata HTML and generate metadata.json",
+    p_dl = sub.add_parser(
+        "sync",
+        help="Sincronizar publicações RTN com o diretório local",
     )
-    p_meta.add_argument(
+    p_dl.add_argument(
         "-o",
         "--output",
         type=Path,
         default=DEFAULT_DATA_DIR,
-        help=f"Output directory for metadata (default: {DEFAULT_DATA_DIR})",
+        help=f"Diretório de destino (padrão: {DEFAULT_DATA_DIR})",
     )
-    p_meta.add_argument("--encoding", default="utf-8", help="File encoding")
-    p_meta.add_argument(
+    p_dl.add_argument(
+        "--metadata",
+        type=Path,
+        default=None,
+        metavar="FILE",
+        help="JSON de metadados existente (dispensa busca online)",
+    )
+    p_dl.add_argument(
         "--force",
         action="store_true",
-        help="Refetch HTML even if it exists",
-    )
-    p_meta.set_defaults(func=cmd_metadata)
-
-    p_dl = fetch_sub.add_parser(
-        "download",
-        help="Download files referenced in metadata.json",
-    )
-    p_dl.add_argument(
-        "-o",
-        "--output",
-        type=Path,
-        default=DEFAULT_DATA_DIR,
-        help=f"Destination root directory (default: {DEFAULT_DATA_DIR})",
-    )
-    p_dl.add_argument(
-        "--encoding",
-        default="utf-8",
-        help="File encoding for HTML files",
+        help="Rebaixar metadados mesmo se já existirem",
     )
     p_dl.add_argument(
         "--concurrency",
         type=int,
         default=4,
-        help="Maximum concurrent downloads (default: 4)",
+        help="Downloads simultâneos (padrão: 4)",
     )
     p_dl.set_defaults(func=cmd_download)
 
-    p_latest = fetch_sub.add_parser(
-        "latest", help="Download latest single file"
+    p_latest = sub.add_parser(
+        "latest",
+        help="Baixar o arquivo da série histórica RTN mais recente",
     )
     p_latest.add_argument(
         "-o",
         "--output",
         type=Path,
         default=DEFAULT_DATA_DIR,
-        help=f"Destination directory (default: {DEFAULT_DATA_DIR})",
+        help=f"Diretório de destino (padrão: {DEFAULT_DATA_DIR})",
     )
     p_latest.set_defaults(func=cmd_latest)
 
     p_export = sub.add_parser(
-        "export", help="Export RTN data to various formats"
+        "export",
+        help="Exportar dados RTN para diferentes formatos",
     )
-    export_sub = p_export.add_subparsers(dest="command", required=True)
+    export_sub = p_export.add_subparsers(dest="export_command", required=True)
 
-    p_excel = export_sub.add_parser("excel", help="Export RTN data to Excel")
+    p_excel = export_sub.add_parser("excel", help="Exportar para Excel")
     p_excel.add_argument(
         "-o",
         "--output",
         type=Path,
         default=DEFAULT_DATA_DIR,
-        help=f"Directory containing RTN files (default: {DEFAULT_DATA_DIR})",
+        help=f"Diretório com arquivos RTN (padrão: {DEFAULT_DATA_DIR})",
     )
     p_excel.add_argument(
         "--save-as",
         dest="save_as",
         type=Path,
         default=Path("rtn_processed.xlsx"),
-        help="Output Excel file path (default: rtn_processed.xlsx)",
+        help="Arquivo Excel de saída (padrão: rtn_processed.xlsx)",
     )
     p_excel.set_defaults(func=cmd_export_excel)
 
-    p_sqlite = export_sub.add_parser(
-        "sqlite", help="Export RTN data to SQLite"
-    )
+    p_sqlite = export_sub.add_parser("sqlite", help="Exportar para SQLite")
     p_sqlite.add_argument(
         "-o",
         "--output",
         type=Path,
         default=DEFAULT_DATA_DIR,
-        help=f"Directory containing RTN files (default: {DEFAULT_DATA_DIR})",
+        help=f"Diretório com arquivos RTN (padrão: {DEFAULT_DATA_DIR})",
     )
     p_sqlite.add_argument(
         "--save-as",
         dest="save_as",
         type=Path,
         default=Path("rtn_data.db"),
-        help="Output SQLite database path (default: rtn_data.db)",
+        help="Arquivo SQLite de saída (padrão: rtn_data.db)",
     )
     p_sqlite.set_defaults(func=cmd_export_sqlite)
 
     return parser
 
 
-def main() -> int:
-    parser = build_parser()
-    args = parser.parse_args()
+def main(argv: list[str] | None = None) -> None:
+    parser = get_parser()
+    args = parser.parse_args(argv)
     configure_cli_logging(verbose=args.verbose)
-    return args.func(args)
+    args.func(args)
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    main()

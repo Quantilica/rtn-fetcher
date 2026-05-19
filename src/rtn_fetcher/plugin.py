@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import sqlite3
 from pathlib import Path
 from typing import Annotated
@@ -14,6 +15,17 @@ from typing import Annotated
 import typer
 from bs4 import BeautifulSoup
 from rich.console import Console
+from rich.logging import RichHandler
+from rich.progress import (
+    BarColumn,
+    MofNCompleteColumn,
+    Progress,
+    SpinnerColumn,
+    TextColumn,
+    TimeElapsedColumn,
+    TimeRemainingColumn,
+)
+from rich.table import Table
 
 from rtn_fetcher import (
     download_latest_file,
@@ -31,106 +43,184 @@ from rtn_fetcher.cli import (
 )
 
 app = typer.Typer(help="Resultado do Tesouro Nacional (RTN).")
-fetch_sub = typer.Typer(help="Buscar metadados e baixar arquivos RTN.")
 export_sub = typer.Typer(help="Exportar dados RTN para diferentes formatos.")
-app.add_typer(fetch_sub, name="fetch")
 app.add_typer(export_sub, name="export")
 
 _DEFAULT_OUTPUT = Path("/data/rtn")
 console = Console()
 
-# Tabela de contas RTN usa 10 colunas de hierarquia (P_1..P_10).
 HIERARCHY_COLUMNS = get_hierarchy_columns(10)
 
 
-@fetch_sub.command("metadata")
-def cmd_metadata(
-    output: Annotated[
-        Path,
-        typer.Option(
-            "-o",
-            "--output",
-            help="Diretório para metadata.html e metadata.json",
-        ),
-    ] = _DEFAULT_OUTPUT,
-    encoding: Annotated[str, typer.Option("--encoding")] = "utf-8",
-    force: Annotated[
-        bool, typer.Option("--force", help="Rebaixar HTML mesmo se já existir")
-    ] = False,
-) -> None:
-    """Buscar metadados HTML e gerar metadata.json."""
-    out_html = output / "metadata.html"
-    out_json = output / "metadata.json"
-
-    if out_html.exists() and not force:
-        metadata_html = out_html.read_text(encoding=encoding)
-    else:
-        with console.status("[cyan]Buscando metadados RTN...[/cyan]"):
-            metadata_html = fetch_publications_metadata()
-        out_html.parent.mkdir(parents=True, exist_ok=True)
-        out_html.write_text(metadata_html, encoding=encoding)
-
-    soup = BeautifulSoup(metadata_html, "html.parser")
-    publications = extract_publication_metadata(soup)
-    out_json.parent.mkdir(parents=True, exist_ok=True)
-    out_json.write_text(
-        json.dumps(publications, ensure_ascii=False, indent=2),
-        encoding=encoding,
-    )
-    console.print(
-        f"[green]✓[/green] Salvas [bold]{len(publications)}[/bold] "
-        f"publicações em [bold]{out_json}[/bold]"
+def _setup_logging(verbose: bool) -> None:
+    level = logging.DEBUG if verbose else logging.WARNING
+    logging.basicConfig(
+        level=level,
+        format="%(message)s",
+        datefmt="[%X]",
+        handlers=[RichHandler(console=console, show_path=False)],
+        force=True,
     )
 
 
-@fetch_sub.command("download")
+def _make_progress() -> Progress:
+    return Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        MofNCompleteColumn(),
+        TimeElapsedColumn(),
+        TimeRemainingColumn(),
+        console=console,
+    )
+
+
+@app.command("sync")
 def cmd_download(
-    metadata: Annotated[
-        Path, typer.Option("--metadata", help="Caminho do JSON de metadados")
-    ] = _DEFAULT_OUTPUT / "metadata.json",
     output: Annotated[
         Path, typer.Option("-o", "--output", help="Diretório de destino")
     ] = _DEFAULT_OUTPUT,
-    encoding: Annotated[str, typer.Option("--encoding")] = "utf-8",
+    metadata: Annotated[
+        Path | None,
+        typer.Option(
+            "--metadata",
+            help="JSON de metadados existente (dispensa busca online)",
+        ),
+    ] = None,
     concurrency: Annotated[
         int, typer.Option("--concurrency", help="Downloads simultâneos")
     ] = 4,
+    force: Annotated[
+        bool,
+        typer.Option(
+            "--force", help="Rebaixar metadados mesmo se já existirem"
+        ),
+    ] = False,
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Listar arquivos sem baixar")
+    ] = False,
+    verbose: Annotated[
+        bool, typer.Option("--verbose", help="Logs detalhados")
+    ] = False,
 ) -> None:
-    """Baixar arquivos referenciados no metadata.json."""
+    """Sincronizar publicações RTN com o diretório local."""
     from quantilica_core.http import BROWSER_HEADERS, AsyncHttpClient
 
-    if not metadata.exists():
-        console.print(
-            f"[red]Metadados não encontrados:[/red] {metadata}", stderr=True
-        )
-        raise typer.Exit(2)
+    _setup_logging(verbose)
+    output.mkdir(parents=True, exist_ok=True)
 
-    publications = json.loads(metadata.read_text(encoding=encoding))
-
-    async def _run() -> None:
-        semaphore = asyncio.Semaphore(concurrency)
-        client = AsyncHttpClient(timeout=600.0, headers=BROWSER_HEADERS)
-        tasks = [
-            _bounded_download(
-                pub, filename, url, client, output, encoding, semaphore
+    # Resolve publication list — from file or via network
+    if metadata is not None:
+        if not metadata.exists():
+            console.print(
+                f"[red]Erro:[/red] metadados não encontrados: {metadata}"
             )
-            for pub in publications
-            for filename, url in pub.get("links", {}).items()
-        ]
-        if tasks:
-            await asyncio.gather(*tasks)
+            raise typer.Exit(code=1)
+        publications = json.loads(metadata.read_text(encoding="utf-8"))
+    else:
+        out_html = output / "metadata.html"
+        if out_html.exists() and not force:
+            metadata_html = out_html.read_text(encoding="utf-8")
+        else:
+            with console.status("[cyan]Buscando metadados RTN...[/cyan]"):
+                metadata_html = fetch_publications_metadata()
+            out_html.write_text(metadata_html, encoding="utf-8")
+        soup = BeautifulSoup(metadata_html, "html.parser")
+        publications = extract_publication_metadata(soup)
 
-    with console.status("[cyan]Baixando arquivos RTN...[/cyan]"):
-        asyncio.run(_run())
+    tasks_info = [
+        (pub, filename, url)
+        for pub in publications
+        for filename, url in pub.get("links", {}).items()
+    ]
+    total = len(tasks_info)
+
+    if dry_run:
+        t = Table(show_header=True, header_style="bold")
+        t.add_column("Arquivo", style="cyan")
+        t.add_column("Período", style="dim")
+        for pub, fn, _ in tasks_info:
+            t.add_row(
+                fn,
+                f"{pub.get('ano_publicacao')}-{pub.get('mes_publicacao'):0>2}",
+            )
+        console.print(t)
+        console.print(f"[bold]Total:[/bold] {total} arquivo(s)")
+        return
+
+    ok = failed = skipped = 0
+
+    with _make_progress() as progress:
+        task = progress.add_task(
+            "[cyan]Baixando arquivos RTN...[/cyan]", total=total
+        )
+
+        def on_done(filename: str, result: str) -> None:
+            nonlocal ok, failed, skipped
+            if result == "ok":
+                ok += 1
+            elif result == "skipped":
+                skipped += 1
+            else:
+                failed += 1
+            progress.update(
+                task,
+                advance=1,
+                description=(
+                    f"[green]{ok}✓[/green]  "
+                    f"[red]{failed}✗[/red]  "
+                    f"[dim]{skipped} skip[/dim]"
+                ),
+            )
+
+        async def _run() -> None:
+            semaphore = asyncio.Semaphore(concurrency)
+            client = AsyncHttpClient(timeout=600.0, headers=BROWSER_HEADERS)
+            await asyncio.gather(
+                *[
+                    _bounded_download(
+                        pub,
+                        fn,
+                        url,
+                        client,
+                        output,
+                        "utf-8",
+                        semaphore,
+                        on_done=on_done,
+                    )
+                    for pub, fn, url in tasks_info
+                ]
+            )
+
+        try:
+            asyncio.run(_run())
+        except KeyboardInterrupt:
+            console.print("[yellow]Download cancelado.[/yellow]")
+            raise typer.Exit(code=130) from None
+
+    if failed:
+        console.print(
+            f"[yellow]⚠[/yellow]  {ok} OK · "
+            f"[red]{failed} falha(s)[/red] · {skipped} pulados"
+        )
+    else:
+        console.print(
+            f"[green]✓[/green]  [bold]{ok}[/bold] baixados · "
+            f"[dim]{skipped} pulados[/dim]"
+        )
 
 
-@fetch_sub.command("latest")
+@app.command("latest")
 def cmd_latest(
     output: Annotated[
         Path, typer.Option("-o", "--output", help="Diretório de destino")
     ] = _DEFAULT_OUTPUT,
+    verbose: Annotated[
+        bool, typer.Option("--verbose", help="Logs detalhados")
+    ] = False,
 ) -> None:
-    """Baixar o arquivo RTN mais recente."""
+    """Baixar o arquivo da série histórica RTN mais recente."""
+    _setup_logging(verbose)
     output.mkdir(parents=True, exist_ok=True)
     with console.status("[cyan]Baixando arquivo RTN mais recente...[/cyan]"):
         filepath = download_latest_file(output)
@@ -147,13 +237,33 @@ def cmd_export_excel(
     save_as: Annotated[
         Path, typer.Option("--save-as", help="Arquivo Excel de saída")
     ] = Path("rtn_processed.xlsx"),
+    file: Annotated[
+        Path | None,
+        typer.Option(
+            "--file", help="Arquivo RTN local (dispensa download automático)"
+        ),
+    ] = None,
+    verbose: Annotated[
+        bool, typer.Option("--verbose", help="Logs detalhados")
+    ] = False,
 ) -> None:
     """Exportar dados RTN para Excel."""
     from openpyxl import Workbook
 
+    _setup_logging(verbose)
     output.mkdir(parents=True, exist_ok=True)
-    with console.status("[cyan]Baixando e processando dados RTN...[/cyan]"):
-        filepath = download_latest_file(output)
+
+    if file is not None:
+        filepath = file
+    else:
+        with console.status(
+            "[cyan]Baixando arquivo RTN mais recente...[/cyan]"
+        ):
+            filepath = download_latest_file(output)
+
+    with console.status(
+        f"[cyan]Lendo planilhas de {filepath.name}...[/cyan]"
+    ):
         results = read_all_sheets(filepath)
 
     wb = Workbook()
@@ -218,14 +328,47 @@ def cmd_export_sqlite(
     save_as: Annotated[
         Path, typer.Option("--save-as", help="Arquivo SQLite de saída")
     ] = Path("rtn_data.db"),
+    file: Annotated[
+        Path | None,
+        typer.Option(
+            "--file", help="Arquivo RTN local (dispensa download automático)"
+        ),
+    ] = None,
+    force: Annotated[
+        bool,
+        typer.Option(
+            "--force",
+            "-f",
+            help="Sobrescrever banco existente sem confirmação",
+        ),
+    ] = False,
+    verbose: Annotated[
+        bool, typer.Option("--verbose", help="Logs detalhados")
+    ] = False,
 ) -> None:
     """Exportar dados RTN para SQLite."""
+    _setup_logging(verbose)
     output.mkdir(parents=True, exist_ok=True)
-    with console.status("[cyan]Baixando e processando dados RTN...[/cyan]"):
-        filepath = download_latest_file(output)
+
+    if file is not None:
+        filepath = file
+    else:
+        with console.status(
+            "[cyan]Baixando arquivo RTN mais recente...[/cyan]"
+        ):
+            filepath = download_latest_file(output)
+
+    with console.status(
+        f"[cyan]Lendo planilhas de {filepath.name}...[/cyan]"
+    ):
         results = read_all_sheets(filepath)
 
     if save_as.exists():
+        if not force:
+            typer.confirm(
+                f"O banco '{save_as}' já existe. Sobrescrever?",
+                abort=True,
+            )
         save_as.unlink()
 
     conn = sqlite3.connect(save_as)
