@@ -10,7 +10,11 @@ from pathlib import Path
 import quantilica_core.metadata as core_meta
 from bs4 import BeautifulSoup
 from quantilica_core.exceptions import ParseError
-from quantilica_core.files import write_bytes_atomic, write_text_atomic
+from quantilica_core.files import (
+    is_complete_file,
+    write_bytes_atomic,
+    write_text_atomic,
+)
 from quantilica_core.http import AsyncHttpClient, HttpClient
 from quantilica_core.logging import get_logger, log_step
 from quantilica_core.storage import stamp_filename
@@ -71,7 +75,7 @@ def download_latest_file(destination_dir: Path) -> Path:
         filename = generate_filename(modified_date)
         destination_path = Path(destination_dir) / filename
 
-        if destination_path.exists():
+        if is_complete_file(destination_path):
             logger.info(f"File {filename} already exists, skipping download.")
             return destination_path
 

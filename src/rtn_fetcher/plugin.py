@@ -7,23 +7,16 @@ from __future__ import annotations
 
 import asyncio
 import json
-import logging
 import sqlite3
 from pathlib import Path
 from typing import Annotated
 
 import typer
 from bs4 import BeautifulSoup
-from rich.console import Console
-from rich.logging import RichHandler
-from rich.progress import (
-    BarColumn,
-    MofNCompleteColumn,
-    Progress,
-    SpinnerColumn,
-    TextColumn,
-    TimeElapsedColumn,
-    TimeRemainingColumn,
+from quantilica_core.cli import (
+    get_console,
+    make_batch_progress,
+    setup_rich_logging,
 )
 from rich.rule import Rule
 from rich.table import Table
@@ -48,32 +41,9 @@ export_sub = typer.Typer(help="Exportar dados RTN para diferentes formatos.")
 app.add_typer(export_sub, name="export")
 
 _DEFAULT_OUTPUT = Path("/data/rtn")
-console = Console()
+console = get_console()
 
 HIERARCHY_COLUMNS = get_hierarchy_columns(10)
-
-
-def _setup_logging(verbose: bool) -> None:
-    level = logging.DEBUG if verbose else logging.WARNING
-    logging.basicConfig(
-        level=level,
-        format="%(message)s",
-        datefmt="[%X]",
-        handlers=[RichHandler(console=console, show_path=False)],
-        force=True,
-    )
-
-
-def _make_progress() -> Progress:
-    return Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        BarColumn(),
-        MofNCompleteColumn(),
-        TimeElapsedColumn(),
-        TimeRemainingColumn(),
-        console=console,
-    )
 
 
 def _resolve_publications(
@@ -112,7 +82,7 @@ def _sync_publications(
     ]
     ok = failed = skipped = 0
 
-    with _make_progress() as progress:
+    with make_batch_progress(console) as progress:
         task = progress.add_task(
             "[cyan]Baixando arquivos RTN...[/cyan]", total=len(tasks_info)
         )
@@ -196,7 +166,7 @@ def cmd_sync(
     ] = False,
 ) -> None:
     """Sincronizar publicações RTN com o diretório local."""
-    _setup_logging(verbose)
+    setup_rich_logging(verbose, console=console)
     output.mkdir(parents=True, exist_ok=True)
 
     if latest:
@@ -420,7 +390,7 @@ def cmd_export_excel(
     ] = False,
 ) -> None:
     """Exportar dados RTN para Excel."""
-    _setup_logging(verbose)
+    setup_rich_logging(verbose, console=console)
     output.mkdir(parents=True, exist_ok=True)
     _export_excel(_resolve_rtn_file(output, file), save_as)
 
@@ -454,7 +424,7 @@ def cmd_export_sqlite(
     ] = False,
 ) -> None:
     """Exportar dados RTN para SQLite."""
-    _setup_logging(verbose)
+    setup_rich_logging(verbose, console=console)
     output.mkdir(parents=True, exist_ok=True)
     _export_sqlite(_resolve_rtn_file(output, file), save_as, force)
 
@@ -484,7 +454,7 @@ def cmd_pipeline(
     ] = False,
 ) -> None:
     """Pipeline completo RTN (sync → export)."""
-    _setup_logging(verbose)
+    setup_rich_logging(verbose, console=console)
     if fmt not in ("excel", "sqlite"):
         console.print(
             f"[red]Erro:[/red] formato inválido '{fmt}' (use excel ou sqlite)"
