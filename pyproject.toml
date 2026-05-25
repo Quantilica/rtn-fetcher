@@ -54,7 +54,7 @@ dev = [
 packages = ["src/rtn_fetcher"]
 
 [tool.ruff]
-line-length = 79
+line-length = 88
 target-version = "py312"
 
 [tool.ruff.lint]
