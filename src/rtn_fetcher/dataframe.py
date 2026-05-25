@@ -16,8 +16,8 @@ from .table import Tbl
 def to_pandas(tbl: Tbl) -> "pd.DataFrame":
     """Convert Tbl to pandas DataFrame.
 
-    Requires pandas to be installed:
-        pip install rtn-fetcher[pandas]
+    pandas is not a dependency of rtn-fetcher; install it separately:
+        pip install pandas
 
     Args:
         tbl: Tbl object to convert.
@@ -39,7 +39,7 @@ def to_pandas(tbl: Tbl) -> "pd.DataFrame":
     except ImportError as e:
         raise ImportError(
             "pandas is required to use to_pandas(). "
-            "Install it with: pip install rtn-fetcher[pandas]"
+            "Install it with: pip install pandas"
         ) from e
 
     header = tbl.get_header()

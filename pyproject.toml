@@ -45,7 +45,6 @@ rtn-fetcher = "rtn_fetcher.cli:main"
 rtn = "rtn_fetcher.plugin:app"
 
 [project.optional-dependencies]
-pandas = ["pandas>=2.0.0"]
 dev = [
     "ruff>=0.9.0",
     "pytest>=8.0.0",

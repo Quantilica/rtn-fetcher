@@ -158,7 +158,8 @@ class Tbl:
     def to_pandas(self) -> "pd.DataFrame":
         """Convert to pandas DataFrame.
 
-        Requires pandas to be installed: pip install rtn-fetcher[pandas]
+        pandas is not a dependency of rtn-fetcher; install it separately:
+            pip install pandas
 
         Returns:
             pandas DataFrame with same data and column names.
@@ -169,7 +170,7 @@ class Tbl:
         try:
             import pandas as pd
         except ImportError as e:
-            msg = "pandas required: pip install rtn-fetcher[pandas]"
+            msg = "pandas required: pip install pandas"
             raise ImportError(msg) from e
 
         header = self.get_header()
