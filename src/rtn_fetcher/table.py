@@ -182,19 +182,12 @@ class Tbl:
     def to_polars(self) -> "pl.DataFrame":
         """Convert to polars DataFrame.
 
-        Requires polars to be installed: pip install rtn-fetcher[polars]
+        polars is available via the quantilica-io dependency — no extra required.
 
         Returns:
             polars DataFrame with same data and column names.
-
-        Raises:
-            ImportError: If polars is not installed.
         """
-        try:
-            import polars as pl
-        except ImportError as e:
-            msg = "polars required: pip install rtn-fetcher[polars]"
-            raise ImportError(msg) from e
+        import polars as pl
 
         header = self.get_header()
         columns = {

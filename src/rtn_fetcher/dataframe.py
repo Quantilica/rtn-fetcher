@@ -53,8 +53,7 @@ def to_pandas(tbl: Tbl) -> "pd.DataFrame":
 def to_polars(tbl: Tbl) -> "pl.DataFrame":
     """Convert Tbl to polars DataFrame.
 
-    Requires polars to be installed:
-        pip install rtn-fetcher[polars]
+    polars is available via the quantilica-io dependency — no extra required.
 
     Args:
         tbl: Tbl object to convert.
@@ -62,22 +61,13 @@ def to_polars(tbl: Tbl) -> "pl.DataFrame":
     Returns:
         polars DataFrame with same data and column names.
 
-    Raises:
-        ImportError: If polars is not installed.
-
     Example:
         >>> from rtn_fetcher import read_sheet, to_polars
         >>> data, accounts = read_sheet(filepath, "1.2")
         >>> df = to_polars(data)
         >>> df.head()
     """
-    try:
-        import polars as pl
-    except ImportError as e:
-        raise ImportError(
-            "polars is required to use to_polars(). "
-            "Install it with: pip install rtn-fetcher[polars]"
-        ) from e
+    import polars as pl
 
     header = tbl.get_header()
     columns = {
