@@ -32,9 +32,7 @@ def write_table_to_parquet(
     """
     if sheet_name not in SHEET_CONFIGS:
         available = ", ".join(SHEET_CONFIGS.keys())
-        raise ValueError(
-            f"Unknown sheet '{sheet_name}'. Available: {available}"
-        )
+        raise ValueError(f"Unknown sheet '{sheet_name}'. Available: {available}")
 
     contract = build_contract(sheet_name, SHEET_CONFIGS[sheet_name])
     df = contract.cast(to_polars(data))

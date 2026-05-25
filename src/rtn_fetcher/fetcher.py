@@ -64,9 +64,7 @@ def download_latest_file(destination_dir: Path) -> Path:
             raise ParseError("Response missing Last-Modified header")
 
         try:
-            modified_date = dt.datetime.strptime(
-                last_modified_header, HTTP_DATE_FORMAT
-            )
+            modified_date = dt.datetime.strptime(last_modified_header, HTTP_DATE_FORMAT)
         except ValueError as exc:
             raise ParseError(
                 f"Invalid Last-Modified date format: {last_modified_header}"

@@ -52,9 +52,7 @@ def _resolve_publications(
     """Resolve a lista de publicações RTN (de arquivo ou via rede)."""
     if metadata is not None:
         if not metadata.exists():
-            console.print(
-                f"[red]Erro:[/red] metadados não encontrados: {metadata}"
-            )
+            console.print(f"[red]Erro:[/red] metadados não encontrados: {metadata}")
             raise typer.Exit(code=1)
         return json.loads(metadata.read_text(encoding="utf-8"))
 
@@ -138,9 +136,7 @@ def cmd_sync(
     ] = _DEFAULT_OUTPUT,
     latest: Annotated[
         bool,
-        typer.Option(
-            "--latest", help="Baixar apenas a série histórica mais recente"
-        ),
+        typer.Option("--latest", help="Baixar apenas a série histórica mais recente"),
     ] = False,
     metadata: Annotated[
         Path | None,
@@ -154,29 +150,22 @@ def cmd_sync(
     ] = 4,
     force: Annotated[
         bool,
-        typer.Option(
-            "--force", help="Rebaixar metadados mesmo se já existirem"
-        ),
+        typer.Option("--force", help="Rebaixar metadados mesmo se já existirem"),
     ] = False,
     dry_run: Annotated[
         bool, typer.Option("--dry-run", help="Listar arquivos sem baixar")
     ] = False,
-    verbose: Annotated[
-        bool, typer.Option("--verbose", help="Logs detalhados")
-    ] = False,
+    verbose: Annotated[bool, typer.Option("--verbose", help="Logs detalhados")] = False,
 ) -> None:
     """Sincronizar publicações RTN com o diretório local."""
     setup_rich_logging(verbose, console=console)
     output.mkdir(parents=True, exist_ok=True)
 
     if latest:
-        with console.status(
-            "[cyan]Baixando arquivo RTN mais recente...[/cyan]"
-        ):
+        with console.status("[cyan]Baixando arquivo RTN mais recente...[/cyan]"):
             filepath = download_latest_file(output)
         console.print(
-            f"[green]✓[/green] Arquivo RTN mais recente:"
-            f" [bold]{filepath}[/bold]"
+            f"[green]✓[/green] Arquivo RTN mais recente: [bold]{filepath}[/bold]"
         )
         return
 
@@ -194,17 +183,14 @@ def cmd_sync(
         for pub, fn, _ in tasks_info:
             t.add_row(
                 fn,
-                f"{pub.get('ano_publicacao')}"
-                f"-{pub.get('mes_publicacao'):0>2}",
+                f"{pub.get('ano_publicacao')}-{pub.get('mes_publicacao'):0>2}",
             )
         console.print(t)
         console.print(f"[bold]Total:[/bold] {len(tasks_info)} arquivo(s)")
         return
 
     try:
-        ok, failed, skipped = _sync_publications(
-            output, publications, concurrency
-        )
+        ok, failed, skipped = _sync_publications(output, publications, concurrency)
     except KeyboardInterrupt:
         console.print("[yellow]Download cancelado.[/yellow]")
         raise typer.Exit(code=130) from None
@@ -225,9 +211,7 @@ def _export_excel(filepath: Path, save_as: Path) -> None:
     """Exportar um arquivo RTN para Excel."""
     from openpyxl import Workbook
 
-    with console.status(
-        f"[cyan]Lendo planilhas de {filepath.name}...[/cyan]"
-    ):
+    with console.status(f"[cyan]Lendo planilhas de {filepath.name}...[/cyan]"):
         results = read_all_sheets(filepath)
 
     wb = Workbook()
@@ -286,9 +270,7 @@ def _export_excel(filepath: Path, save_as: Path) -> None:
 
 def _export_sqlite(filepath: Path, save_as: Path, force: bool) -> None:
     """Exportar um arquivo RTN para SQLite."""
-    with console.status(
-        f"[cyan]Lendo planilhas de {filepath.name}...[/cyan]"
-    ):
+    with console.status(f"[cyan]Lendo planilhas de {filepath.name}...[/cyan]"):
         results = read_all_sheets(filepath)
 
     if save_as.exists():
@@ -354,18 +336,14 @@ def _export_sqlite(filepath: Path, save_as: Path, force: bool) -> None:
 
     conn.commit()
     conn.close()
-    console.print(
-        f"[green]✓[/green] Banco de dados salvo em [bold]{save_as}[/bold]"
-    )
+    console.print(f"[green]✓[/green] Banco de dados salvo em [bold]{save_as}[/bold]")
 
 
 def _resolve_rtn_file(output: Path, file: Path | None) -> Path:
     """Devolver o arquivo RTN local, baixando o mais recente se preciso."""
     if file is not None:
         return file
-    with console.status(
-        "[cyan]Baixando arquivo RTN mais recente...[/cyan]"
-    ):
+    with console.status("[cyan]Baixando arquivo RTN mais recente...[/cyan]"):
         return download_latest_file(output)
 
 
@@ -385,9 +363,7 @@ def cmd_export_excel(
             help="Arquivo RTN local (dispensa download automático)",
         ),
     ] = None,
-    verbose: Annotated[
-        bool, typer.Option("--verbose", help="Logs detalhados")
-    ] = False,
+    verbose: Annotated[bool, typer.Option("--verbose", help="Logs detalhados")] = False,
 ) -> None:
     """Exportar dados RTN para Excel."""
     setup_rich_logging(verbose, console=console)
@@ -419,9 +395,7 @@ def cmd_export_sqlite(
             help="Sobrescrever banco existente sem confirmação",
         ),
     ] = False,
-    verbose: Annotated[
-        bool, typer.Option("--verbose", help="Logs detalhados")
-    ] = False,
+    verbose: Annotated[bool, typer.Option("--verbose", help="Logs detalhados")] = False,
 ) -> None:
     """Exportar dados RTN para SQLite."""
     setup_rich_logging(verbose, console=console)
@@ -449,9 +423,7 @@ def cmd_pipeline(
         bool,
         typer.Option("--force", help="Sobrescrever saídas existentes"),
     ] = False,
-    verbose: Annotated[
-        bool, typer.Option("--verbose", help="Logs detalhados")
-    ] = False,
+    verbose: Annotated[bool, typer.Option("--verbose", help="Logs detalhados")] = False,
 ) -> None:
     """Pipeline completo RTN (sync → export)."""
     setup_rich_logging(verbose, console=console)
@@ -465,9 +437,7 @@ def cmd_pipeline(
     console.print(Rule("[bold]Passo 1/2: Sincronização[/bold]"))
     publications = _resolve_publications(output, None, force)
     ok, failed, skipped = _sync_publications(output, publications, concurrency)
-    console.print(
-        f"[green]✓[/green] {ok} baixados · {failed} falhas · {skipped} skip"
-    )
+    console.print(f"[green]✓[/green] {ok} baixados · {failed} falhas · {skipped} skip")
 
     console.print(Rule("[bold]Passo 2/2: Exportação[/bold]"))
     filepath = _resolve_rtn_file(output, None)

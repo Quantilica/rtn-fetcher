@@ -114,9 +114,7 @@ def parse_account_name(name: str) -> tuple[str, str]:
     if match and _looks_like_account_code(match.group(1)):
         account_code = match.group(1).strip()
 
-    account_name = clean_account_name(
-        name[match.end() :] if account_code else name
-    )
+    account_name = clean_account_name(name[match.end() :] if account_code else name)
     account_code = normalize_account_code(account_code)
 
     return account_code, account_name
@@ -162,14 +160,10 @@ def expand_account_hierarchy(accounts_data: Tbl) -> Tbl:
         if code_parts[0] == AUTO_ACCOUNT_PREFIX:
             full_account_name = account_name
         else:
-            full_account_name = (
-                f"{ACCOUNT_SEPARATOR.join(code_parts)} {account_name}"
-            )
+            full_account_name = f"{ACCOUNT_SEPARATOR.join(code_parts)} {account_name}"
 
         row_parts = (
-            last_parts[: level - 1]
-            + [account_name]
-            + [None] * (max_level - level)
+            last_parts[: level - 1] + [account_name] + [None] * (max_level - level)
         )
         row = [account_code, full_account_name, account_level, *row_parts]
 

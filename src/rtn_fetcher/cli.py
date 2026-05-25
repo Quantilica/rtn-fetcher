@@ -291,9 +291,7 @@ def cmd_export_excel(args: argparse.Namespace) -> None:
                 continue
             row_dict = dict(zip(acc_header, row, strict=False))
             account_code = row_dict.get("account_code")
-            p_values = [
-                row_dict.get(f"P_{i}") for i in range(1, p_column_count + 1)
-            ]
+            p_values = [row_dict.get(f"P_{i}") for i in range(1, p_column_count + 1)]
             for col_idx, value in enumerate(
                 [
                     f"{sheet_name}|{account_code}",
@@ -395,9 +393,7 @@ def cmd_export_sqlite(args: argparse.Namespace) -> None:
                 continue
             row_dict = dict(zip(acc_header, row, strict=False))
             account_code = row_dict.get("account_code")
-            p_values = [
-                row_dict.get(f"P_{i}") for i in range(1, p_column_count + 1)
-            ]
+            p_values = [row_dict.get(f"P_{i}") for i in range(1, p_column_count + 1)]
             # Pad with None to match the max_p_columns for consistency
             p_values.extend([None] * (max_p_columns - p_column_count))
             placeholders = ", ".join(["?"] * max_p_columns)
