@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING, Any
 from .constants import MAX_DISPLAY_ROWS
 
 if TYPE_CHECKING:
-    import pandas as pd
     import polars as pl
 
 Column = list[Any]
@@ -154,31 +153,6 @@ class Tbl:
             f"{self.__class__.__name__}: {self.nrows} rows × {self.ncols} cols"
         )
         return "\n".join(lines)
-
-    def to_pandas(self) -> "pd.DataFrame":
-        """Convert to pandas DataFrame.
-
-        pandas is not a dependency of rtn-fetcher; install it separately:
-            pip install pandas
-
-        Returns:
-            pandas DataFrame with same data and column names.
-
-        Raises:
-            ImportError: If pandas is not installed.
-        """
-        try:
-            import pandas as pd
-        except ImportError as e:
-            msg = "pandas required: pip install pandas"
-            raise ImportError(msg) from e
-
-        header = self.get_header()
-        columns = {
-            col_name: col_data[1:]
-            for col_name, col_data in zip(header, self.data, strict=False)
-        }
-        return pd.DataFrame(columns)
 
     def to_polars(self) -> "pl.DataFrame":
         """Convert to polars DataFrame.

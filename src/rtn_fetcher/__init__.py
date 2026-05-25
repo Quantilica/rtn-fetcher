@@ -9,7 +9,7 @@ from importlib.metadata import PackageNotFoundError, version
 from quantilica_core.logging import get_logger
 
 from .account import expand_account_hierarchy, parse_account_name
-from .dataframe import to_pandas, to_polars
+from .dataframe import to_polars
 from .extract import (
     build_account_data,
     extract_publication_metadata,
@@ -47,8 +47,7 @@ __all__ = [
     # Account processing
     "parse_account_name",
     "expand_account_hierarchy",
-    # DataFrame conversion (optional)
-    "to_pandas",
+    # DataFrame conversion
     "to_polars",
     # Schema / contracts
     "build_contract",
