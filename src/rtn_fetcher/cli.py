@@ -566,7 +566,11 @@ def main(argv: list[str] | None = None) -> None:
     if not args.verbose:
         logging.getLogger("quantilica_core").setLevel(logging.WARNING)
         logging.getLogger("rtn_fetcher").setLevel(logging.WARNING)
-    args.func(args)
+    try:
+        args.func(args)
+    except KeyboardInterrupt:
+        print("\nOperação cancelada pelo usuário.", file=sys.stderr)
+        sys.exit(130)
 
 
 if __name__ == "__main__":
