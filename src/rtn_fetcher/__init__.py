@@ -6,7 +6,7 @@ pelo Tesouro Nacional do Brasil.
 
 from importlib.metadata import PackageNotFoundError, version
 
-from quantilica_core.logging import get_logger
+from quantilica.core.logging import get_logger
 
 from .account import expand_account_hierarchy, parse_account_name
 from .dataframe import to_polars

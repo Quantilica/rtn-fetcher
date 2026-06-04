@@ -10,8 +10,8 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Literal
 
-from quantilica_core.exceptions import ParseError
-from quantilica_core.logging import get_logger, log_step
+from quantilica.core.exceptions import ParseError
+from quantilica.core.logging import get_logger, log_step
 
 from .account import expand_account_hierarchy, extract_account_column
 from .constants import (

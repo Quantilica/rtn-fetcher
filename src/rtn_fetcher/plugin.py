@@ -13,7 +13,7 @@ from typing import Annotated
 
 import typer
 from bs4 import BeautifulSoup
-from quantilica_core.cli import (
+from quantilica.core.cli import (
     get_console,
     make_batch_progress,
     setup_rich_logging,
@@ -104,7 +104,7 @@ def _sync_publications(
             )
 
         async def _run() -> None:
-            from quantilica_core.http import BROWSER_HEADERS, AsyncHttpClient
+            from quantilica.core.http import BROWSER_HEADERS, AsyncHttpClient
 
             semaphore = asyncio.Semaphore(concurrency)
             client = AsyncHttpClient(timeout=600.0, headers=BROWSER_HEADERS)

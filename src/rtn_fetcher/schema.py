@@ -7,7 +7,7 @@ that Parquet outputs can be cast and validated against a known schema.
 from __future__ import annotations
 
 import polars as pl
-from quantilica_io.schema import DataContract, Field
+from quantilica.analytics.schema import DataContract, Field
 
 from .constants import (
     ACCOUNT_COLUMN,

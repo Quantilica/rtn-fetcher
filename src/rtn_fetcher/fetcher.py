@@ -7,17 +7,17 @@ Tesouro Nacional API.
 import datetime as dt
 from pathlib import Path
 
-import quantilica_core.metadata as core_meta
+import quantilica.core.metadata as core_meta
 from bs4 import BeautifulSoup
-from quantilica_core.exceptions import ParseError
-from quantilica_core.files import (
+from quantilica.core.exceptions import ParseError
+from quantilica.core.files import (
     is_complete_file,
     write_bytes_atomic,
     write_text_atomic,
 )
-from quantilica_core.http import AsyncHttpClient, HttpClient
-from quantilica_core.logging import get_logger, log_step
-from quantilica_core.storage import stamp_filename
+from quantilica.core.http import AsyncHttpClient, HttpClient
+from quantilica.core.logging import get_logger, log_step
+from quantilica.core.storage import stamp_filename
 
 from .constants import (
     HTTP_DATE_FORMAT,

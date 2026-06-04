@@ -2,7 +2,6 @@
 
 import polars as pl
 import pytest
-
 from rtn_fetcher import Tbl, build_contract, write_table_to_parquet
 from rtn_fetcher.constants import SHEET_CONFIGS
 

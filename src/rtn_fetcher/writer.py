@@ -8,8 +8,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from quantilica_core.manifests import DownloadManifest
-from quantilica_io.writer import to_parquet
+from quantilica.analytics.writer import to_parquet
+from quantilica.core.manifests import DownloadManifest
 
 from .constants import SHEET_CONFIGS
 from .dataframe import to_polars

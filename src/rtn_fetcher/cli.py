@@ -22,8 +22,8 @@ from pathlib import Path
 from bs4 import BeautifulSoup
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill
-from quantilica_core.http import BROWSER_HEADERS, AsyncHttpClient
-from quantilica_core.logging import configure_cli_logging
+from quantilica.core.http import BROWSER_HEADERS, AsyncHttpClient
+from quantilica.core.logging import configure_cli_logging
 
 from rtn_fetcher import (
     Tbl,
@@ -564,7 +564,7 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
     configure_cli_logging(verbose=args.verbose)
     if not args.verbose:
-        logging.getLogger("quantilica_core").setLevel(logging.WARNING)
+        logging.getLogger("quantilica.core").setLevel(logging.WARNING)
         logging.getLogger("rtn_fetcher").setLevel(logging.WARNING)
     try:
         args.func(args)
