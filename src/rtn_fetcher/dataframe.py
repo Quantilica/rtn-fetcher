@@ -11,7 +11,7 @@ from .table import Tbl
 def to_polars(tbl: Tbl) -> "pl.DataFrame":
     """Convert Tbl to polars DataFrame.
 
-    polars is available via the quantilica-io dependency — no extra required.
+    polars is available via the quantilica-analytics dependency — no extra required.
 
     Args:
         tbl: Tbl object to convert.

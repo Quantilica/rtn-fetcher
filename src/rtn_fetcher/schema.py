@@ -1,6 +1,6 @@
 """Data contracts for RTN sheets.
 
-Builds a quantilica-io DataContract from a SHEET_CONFIGS entry so
+Builds a quantilica-analytics DataContract from a SHEET_CONFIGS entry so
 that Parquet outputs can be cast and validated against a known schema.
 """
 

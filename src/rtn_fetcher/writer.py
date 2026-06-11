@@ -1,6 +1,6 @@
 """Parquet writer for RTN tables.
 
-Bridges the internal ``Tbl`` representation to quantilica-io's
+Bridges the internal ``Tbl`` representation to quantilica-analytics's
 standardized Parquet output with manifest-backed provenance metadata.
 """
 
