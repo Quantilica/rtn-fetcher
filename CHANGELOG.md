@@ -9,6 +9,11 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ### Corrigido
 
+- `cli.py` usava `logging.getLogger(...)` em `main()` sem importar o módulo
+  `logging` — `NameError` sempre que a CLI rodasse sem `--verbose`. Também
+  padronizado nos demais fetchers do ecossistema que ainda não tinham a
+  supressão de logs verbosos de terceiros (`anac-fetcher`, `anp-fetcher`,
+  `inep-fetcher`).
 - A linha de rodapé `Deflator - IPCA base <mês/ano>`, presente ao final das
   abas de valores constantes (`1.1-A`, `1.2-A`, `1.2-B`, `1.3-A`, `1.4-A`,
   `1.5-A`), não tinha código hierárquico e virava uma pseudo-conta de
