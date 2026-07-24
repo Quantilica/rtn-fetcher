@@ -205,7 +205,12 @@ def is_metadata_row(row: list[Any], account_columns: int) -> bool:
     if not account_text:
         return True
 
-    metadata_prefixes = ("obs.", "fonte:", "memorando", "memorando:")
+    # "Deflator - IPCA base <mês/ano>" é uma linha de rodapé com a razão de
+    # deflação usada nas abas de valores constantes (1.1-A, 1.2-A, 1.2-B,
+    # 1.3-A, 1.4-A, 1.5-A) — não tem código hierárquico e seus valores são
+    # razões (~1-6), não R$; sem este filtro ela virava uma pseudo-conta de
+    # primeiro nível na árvore de contas.
+    metadata_prefixes = ("obs.", "fonte:", "memorando", "memorando:", "deflator")
     if account_text_lower.startswith(metadata_prefixes):
         return True
 
