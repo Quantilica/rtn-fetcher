@@ -5,6 +5,7 @@ from types import SimpleNamespace
 
 import openpyxl
 from openpyxl.styles import Alignment
+
 from rtn_fetcher.reader import is_metadata_row, read_sheet
 
 
