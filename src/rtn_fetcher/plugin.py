@@ -15,7 +15,7 @@ import typer
 from bs4 import BeautifulSoup
 from quantilica.core.cli import (
     get_console,
-    make_batch_progress,
+    make_download_progress,
     setup_rich_logging,
 )
 from rich.rule import Rule
@@ -70,7 +70,7 @@ def _resolve_publications(
 def _sync_publications(
     output: Path,
     publications: list[dict],
-    concurrency: int,
+    workers: int,
 ) -> tuple[int, int, int]:
     """Baixar todas as publicações RTN. Retorna (ok, falhas, pulados)."""
     tasks_info = [
@@ -80,10 +80,20 @@ def _sync_publications(
     ]
     ok = failed = skipped = 0
 
-    with make_batch_progress(console) as progress:
-        task = progress.add_task(
+    file_tasks: dict[str, int] = {}
+    import threading
+
+    lock = threading.Lock()
+
+    with make_download_progress(console) as progress:
+        batch_task = progress.add_task(
             "[cyan]Baixando arquivos RTN...[/cyan]", total=len(tasks_info)
         )
+
+        def on_start(filename: str) -> None:
+            with lock:
+                task_id = progress.add_task(filename, total=None)
+                file_tasks[filename] = task_id
 
         def on_done(filename: str, result: str) -> None:
             nonlocal ok, failed, skipped
@@ -93,8 +103,15 @@ def _sync_publications(
                 skipped += 1
             else:
                 failed += 1
+
+            with lock:
+                if filename in file_tasks:
+                    task_id = file_tasks[filename]
+                    progress.update(task_id, completed=1, total=1)
+                    progress.remove_task(task_id)
+
             progress.update(
-                task,
+                batch_task,
                 advance=1,
                 description=(
                     f"[green]{ok}✓[/green]  "
@@ -106,7 +123,7 @@ def _sync_publications(
         async def _run() -> None:
             from quantilica.core.http import BROWSER_HEADERS, AsyncHttpClient
 
-            semaphore = asyncio.Semaphore(concurrency)
+            semaphore = asyncio.Semaphore(workers)
             client = AsyncHttpClient(timeout=600.0, headers=BROWSER_HEADERS)
             await asyncio.gather(
                 *[
@@ -118,6 +135,7 @@ def _sync_publications(
                         output,
                         "utf-8",
                         semaphore,
+                        on_start=on_start,
                         on_done=on_done,
                     )
                     for pub, fn, url in tasks_info
@@ -145,8 +163,8 @@ def cmd_sync(
             help="JSON de metadados existente (dispensa busca online)",
         ),
     ] = None,
-    concurrency: Annotated[
-        int, typer.Option("--concurrency", help="Downloads simultâneos")
+    workers: Annotated[
+        int, typer.Option("--workers", help="Downloads simultâneos")
     ] = 4,
     force: Annotated[
         bool,
@@ -190,7 +208,7 @@ def cmd_sync(
         return
 
     try:
-        ok, failed, skipped = _sync_publications(output, publications, concurrency)
+        ok, failed, skipped = _sync_publications(output, publications, workers)
     except KeyboardInterrupt:
         console.print("[yellow]Download cancelado.[/yellow]")
         raise typer.Exit(code=130) from None
@@ -416,8 +434,8 @@ def cmd_pipeline(
         Path | None,
         typer.Option("--save-as", help="Arquivo de saída da exportação"),
     ] = None,
-    concurrency: Annotated[
-        int, typer.Option("--concurrency", help="Downloads simultâneos")
+    workers: Annotated[
+        int, typer.Option("--workers", help="Downloads simultâneos")
     ] = 4,
     force: Annotated[
         bool,
@@ -436,7 +454,7 @@ def cmd_pipeline(
 
     console.print(Rule("[bold]Passo 1/2: Sincronização[/bold]"))
     publications = _resolve_publications(output, None, force)
-    ok, failed, skipped = _sync_publications(output, publications, concurrency)
+    ok, failed, skipped = _sync_publications(output, publications, workers)
     console.print(f"[green]✓[/green] {ok} baixados · {failed} falhas · {skipped} skip")
 
     console.print(Rule("[bold]Passo 2/2: Exportação[/bold]"))

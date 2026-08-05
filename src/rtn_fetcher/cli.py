@@ -99,6 +99,7 @@ async def _bounded_download(
     encoding: str,
     semaphore: asyncio.Semaphore,
     *,
+    on_start: Callable[[str], None] | None = None,
     on_done: Callable[[str, str], None] | None = None,
 ) -> None:
     """Download one publication link, gated by ``semaphore``."""
@@ -115,6 +116,8 @@ async def _bounded_download(
         return
 
     async with semaphore:
+        if on_start is not None:
+            on_start(filename)
         logger.debug(f"Downloading {filename}...")
         try:
             await download_publication_link(
@@ -186,7 +189,7 @@ def cmd_download(args: argparse.Namespace) -> None:
         logger.info("[%d/%d] %s (%s)", count, total, filename, result)
 
     async def _run_async_downloads() -> None:
-        semaphore = asyncio.Semaphore(args.concurrency)
+        semaphore = asyncio.Semaphore(args.workers)
         client = AsyncHttpClient(timeout=600.0, headers=BROWSER_HEADERS)
         tasks = [
             _bounded_download(
@@ -197,6 +200,7 @@ def cmd_download(args: argparse.Namespace) -> None:
                 dest,
                 "utf-8",
                 semaphore,
+                on_start=None,
                 on_done=on_done,
             )
             for pub in publications
@@ -461,7 +465,7 @@ def get_parser() -> argparse.ArgumentParser:
         help="Rebaixar metadados mesmo se já existirem",
     )
     p_dl.add_argument(
-        "--concurrency",
+        "--workers",
         type=int,
         default=4,
         help="Downloads simultâneos (padrão: 4)",
@@ -510,7 +514,7 @@ def get_parser() -> argparse.ArgumentParser:
         help="Rebaixar metadados mesmo se já existirem",
     )
     p_pipeline.add_argument(
-        "--concurrency",
+        "--workers",
         type=int,
         default=4,
         help="Downloads simultâneos (padrão: 4)",
