@@ -108,7 +108,7 @@ def _sync_publications(
                 if filename in file_tasks:
                     task_id = file_tasks[filename]
                     progress.update(task_id, completed=1, total=1)
-                    progress.remove_task(task_id)
+                    pass
 
             progress.update(
                 batch_task,
