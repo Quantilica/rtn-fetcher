@@ -90,10 +90,21 @@ def _sync_publications(
             "[cyan]Baixando arquivos RTN...[/cyan]", total=len(tasks_info)
         )
 
+        worker_task_ids = [
+            progress.add_task("[dim]Inativo[/dim]", total=1) for _ in range(workers)
+        ]
+        available_tasks = worker_task_ids.copy()
+
         def on_start(filename: str) -> None:
             with lock:
-                task_id = progress.add_task(filename, total=None)
+                task_id = available_tasks.pop(0)
                 file_tasks[filename] = task_id
+                progress.update(
+                    task_id,
+                    description=f"[cyan]{filename}[/cyan]",
+                    completed=0,
+                    total=None,
+                )
 
         def on_done(filename: str, result: str) -> None:
             nonlocal ok, failed, skipped
@@ -106,9 +117,11 @@ def _sync_publications(
 
             with lock:
                 if filename in file_tasks:
-                    task_id = file_tasks[filename]
-                    progress.update(task_id, completed=1, total=1)
-                    pass
+                    task_id = file_tasks.pop(filename)
+                    progress.update(
+                        task_id, description="[dim]Inativo[/dim]", completed=0, total=1
+                    )
+                    available_tasks.append(task_id)
 
             progress.update(
                 batch_task,
