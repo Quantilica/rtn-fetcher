@@ -120,6 +120,33 @@ async def download_publication_link(
     write_text_atomic(dest_file, response.text, encoding=text_encoding)
 
 
+def download_publication_link_sync(
+    client: HttpClient,
+    url: str,
+    dest_file: Path,
+    *,
+    text_encoding: str = "utf-8",
+) -> None:
+    """Download an RTN publication link, following iframe wrappers (synchronous)."""
+    response = client.get(url)
+    content_type = response.headers.get("Content-Type", "")
+
+    if not content_type.startswith("text/html"):
+        write_bytes_atomic(dest_file, response.content)
+        return
+
+    soup = BeautifulSoup(response.text, "html.parser")
+    iframe = soup.find("iframe")
+    iframe_src = iframe.get("src") if iframe else None
+    if iframe_src:
+        logger.debug(f"Following iframe src: {iframe_src}")
+        inner = client.get(str(iframe_src))
+        write_bytes_atomic(dest_file, inner.content)
+        return
+
+    write_text_atomic(dest_file, response.text, encoding=text_encoding)
+
+
 def generate_catalog(rtn_files: list[Path]) -> core_meta.MetadataCatalog:
     """Build a validated MetadataCatalog for the given RTN files."""
     source = core_meta.Source(

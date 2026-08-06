@@ -5,7 +5,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import json
 import sqlite3
 from pathlib import Path
@@ -15,7 +14,6 @@ import typer
 from bs4 import BeautifulSoup
 from quantilica.core.cli import (
     get_console,
-    make_download_progress,
     setup_rich_logging,
 )
 from rich.rule import Rule
@@ -29,7 +27,6 @@ from rtn_fetcher import (
 )
 from rtn_fetcher.cli import (
     DATA_COLUMNS,
-    _bounded_download,
     get_column_names,
     get_hierarchy_columns,
     make_period_date,
@@ -80,82 +77,73 @@ def _sync_publications(
     ]
     ok = failed = skipped = 0
 
-    file_tasks: dict[str, int] = {}
-    import threading
+    import concurrent.futures
 
-    lock = threading.Lock()
+    from quantilica.core.cli import (
+        ProgressPool,
+        graceful_executor,
+        make_batch_progress,
+        make_download_progress,
+    )
+    from quantilica.core.http import BROWSER_HEADERS, HttpClient
+    from rich.console import Group
+    from rich.live import Live
 
-    with make_download_progress(console) as progress:
-        batch_task = progress.add_task(
-            "[cyan]Baixando arquivos RTN...[/cyan]", total=len(tasks_info)
-        )
+    from rtn_fetcher.fetcher import download_publication_link_sync
 
-        worker_task_ids = [
-            progress.add_task("[dim]Inativo[/dim]", total=1) for _ in range(workers)
-        ]
-        available_tasks = worker_task_ids.copy()
+    overall = make_batch_progress(console)
+    file_prog = make_download_progress(console)
+    total = len(tasks_info)
+    batch_task = overall.add_task("[cyan]Baixando arquivos RTN...[/cyan]", total=total)
 
-        def on_start(filename: str) -> None:
-            with lock:
-                task_id = available_tasks.pop(0)
-                file_tasks[filename] = task_id
-                progress.update(
-                    task_id,
-                    description=f"[cyan]{filename}[/cyan]",
-                    completed=0,
-                    total=None,
-                )
+    pool = ProgressPool(workers=workers, file_prog=file_prog)
+    client = HttpClient(timeout=600.0, headers=BROWSER_HEADERS)
 
-        def on_done(filename: str, result: str) -> None:
-            nonlocal ok, failed, skipped
-            if result == "ok":
-                ok += 1
-            elif result == "skipped":
-                skipped += 1
-            else:
-                failed += 1
+    def _worker(task: tuple[dict, str, str]) -> str:
+        pub, filename, url = task
+        ano = pub.get("ano_publicacao")
+        mes = pub.get("mes_publicacao")
+        dest_dir = output / f"{ano}-{mes:0>2}"
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        dest_file = dest_dir / filename
 
-            with lock:
-                if filename in file_tasks:
-                    task_id = file_tasks.pop(filename)
-                    progress.update(
-                        task_id, description="[dim]Inativo[/dim]", completed=0, total=1
+        if dest_file.exists():
+            return "skipped"
+
+        try:
+            with pool.acquire(description=f"[cyan]{filename}[/cyan]"):
+                download_publication_link_sync(client, url, dest_file)
+                return "ok"
+        except Exception:
+            return "failed"
+
+    with graceful_executor(max_workers=workers) as executor:
+        try:
+            with Live(
+                Group(overall, file_prog), console=console, refresh_per_second=10
+            ):
+                futures = {executor.submit(_worker, task): task for task in tasks_info}
+                for future in concurrent.futures.as_completed(futures):
+                    overall.update(batch_task, advance=1)
+                    res = future.result()
+                    if res == "ok":
+                        ok += 1
+                    elif res == "skipped":
+                        skipped += 1
+                    else:
+                        failed += 1
+
+                    overall.update(
+                        batch_task,
+                        description=(
+                            f"[green]{ok}✓[/green]  "
+                            f"[red]{failed}✗[/red]  "
+                            f"[dim]{skipped} skip[/dim]"
+                        ),
                     )
-                    available_tasks.append(task_id)
-
-            progress.update(
-                batch_task,
-                advance=1,
-                description=(
-                    f"[green]{ok}✓[/green]  "
-                    f"[red]{failed}✗[/red]  "
-                    f"[dim]{skipped} skip[/dim]"
-                ),
-            )
-
-        async def _run() -> None:
-            from quantilica.core.http import BROWSER_HEADERS, AsyncHttpClient
-
-            semaphore = asyncio.Semaphore(workers)
-            client = AsyncHttpClient(timeout=600.0, headers=BROWSER_HEADERS)
-            await asyncio.gather(
-                *[
-                    _bounded_download(
-                        pub,
-                        fn,
-                        url,
-                        client,
-                        output,
-                        "utf-8",
-                        semaphore,
-                        on_start=on_start,
-                        on_done=on_done,
-                    )
-                    for pub, fn, url in tasks_info
-                ]
-            )
-
-        asyncio.run(_run())
+        except KeyboardInterrupt:
+            console.print("\n[yellow]Download cancelado.[/yellow]")
+            raise typer.Exit(code=130) from None
 
     return ok, failed, skipped
 
