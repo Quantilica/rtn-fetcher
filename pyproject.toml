@@ -1,6 +1,6 @@
 [project]
 name = "rtn-fetcher"
-version = "0.3.0"
+version = "0.3.1"
 description = "RTN data fetching and export utilities"
 readme = "README.md"
 authors = [
@@ -30,7 +30,9 @@ classifiers = [
 dependencies = [
     "beautifulsoup4>=4.14.3",
     "openpyxl>=3.1.5",
-    "quantilica-core>=0.3.2",
+    "quantilica-core>=0.4.0",
+    "quantilica-cli>=0.2.0",
+    "quantilica-catalog>=0.2.0",
     "quantilica-analytics>=0.2.0",
 ]
 
