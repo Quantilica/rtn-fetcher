@@ -7,7 +7,6 @@ Tesouro Nacional API.
 import datetime as dt
 from pathlib import Path
 
-import quantilica.catalog.metadata as core_meta
 from bs4 import BeautifulSoup
 from quantilica.core.exceptions import ParseError
 from quantilica.core.files import (
@@ -145,30 +144,3 @@ def download_publication_link_sync(
         return
 
     write_text_atomic(dest_file, response.text, encoding=text_encoding)
-
-
-def generate_catalog(rtn_files: list[Path]) -> core_meta.MetadataCatalog:
-    """Build a validated MetadataCatalog for the given RTN files."""
-    source = core_meta.Source(
-        id=SOURCE_ID,
-        name="Tesouro Nacional",
-        homepage_url="https://www.tesouro.fazenda.gov.br",
-    )
-    dataset = core_meta.Dataset(
-        id=DATASET_ID,
-        source_id=SOURCE_ID,
-        name="Resultado do Tesouro Nacional (RTN)",
-        description="Série Histórica do Resultado do Tesouro Nacional",
-    )
-    resources = [
-        core_meta.Resource(
-            id=file_path.name.replace(".", "_"),
-            dataset_id=DATASET_ID,
-            name=file_path.name,
-            url=RTN_FILE_BASE_URL,
-            format="xlsx",
-            path=str(file_path.absolute()),
-        )
-        for file_path in rtn_files
-    ]
-    return core_meta.build_simple_catalog(source, dataset, resources)
