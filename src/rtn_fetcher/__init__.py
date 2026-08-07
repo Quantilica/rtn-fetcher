@@ -15,7 +15,7 @@ from .extract import (
     extract_publication_metadata,
     extract_sheet_rows,
 )
-from .fetcher import download_latest_file, fetch_publications_metadata
+from .fetcher import fetch_publications_metadata
 from .reader import read_all_sheets, read_sheet, write_table_to_csv
 from .schema import build_contract
 from .table import Tbl
@@ -34,7 +34,6 @@ __all__ = [
     # Main data structures
     "Tbl",
     # High-level functions
-    "download_latest_file",
     "fetch_publications_metadata",
     "read_sheet",
     "read_all_sheets",

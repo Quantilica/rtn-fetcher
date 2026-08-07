@@ -7,7 +7,7 @@ Tesouro Nacional API.
 import datetime as dt
 from pathlib import Path
 
-import quantilica.core.metadata as core_meta
+import quantilica.catalog.metadata as core_meta
 from bs4 import BeautifulSoup
 from quantilica.core.exceptions import ParseError
 from quantilica.core.files import (
