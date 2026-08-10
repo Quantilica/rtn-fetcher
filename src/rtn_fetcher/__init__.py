@@ -9,7 +9,6 @@ from importlib.metadata import PackageNotFoundError, version
 from quantilica.core.logging import get_logger
 
 from .account import expand_account_hierarchy, parse_account_name
-from .dataframe import to_polars
 from .extract import (
     build_account_data,
     extract_publication_metadata,
@@ -17,9 +16,7 @@ from .extract import (
 )
 from .fetcher import fetch_publications_metadata
 from .reader import read_all_sheets, read_sheet, write_table_to_csv
-from .schema import build_contract
 from .table import Tbl
-from .writer import write_table_to_parquet
 
 try:
     __version__ = version("rtn-fetcher")
@@ -46,8 +43,25 @@ __all__ = [
     # Account processing
     "parse_account_name",
     "expand_account_hierarchy",
-    # DataFrame conversion
-    "to_polars",
-    # Schema / contracts
-    "build_contract",
 ]
+
+try:
+    from .dataframe import to_polars
+    from .schema import build_contract
+    from .writer import write_table_to_parquet
+
+    _HAS_ANALYSIS = True
+except ImportError:
+    _HAS_ANALYSIS = False
+    to_polars = None
+    build_contract = None
+    write_table_to_parquet = None
+
+if _HAS_ANALYSIS:
+    __all__.extend(
+        [
+            "to_polars",
+            "build_contract",
+            "write_table_to_parquet",
+        ]
+    )

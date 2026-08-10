@@ -31,6 +31,10 @@ dependencies = [
     "beautifulsoup4>=4.14.3",
     "openpyxl>=3.1.5",
     "quantilica-core>=0.4.0",
+]
+
+[project.optional-dependencies]
+analysis = [
     "quantilica-analytics>=0.2.0",
 ]
 

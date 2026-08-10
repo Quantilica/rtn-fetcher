@@ -157,7 +157,7 @@ class Tbl:
     def to_polars(self) -> "pl.DataFrame":
         """Convert to polars DataFrame.
 
-        polars is available via the quantilica-analytics dependency — no extra required.
+        Requer extra 'analysis' instalado via quantilica-analytics.
 
         Returns:
             polars DataFrame with same data and column names.
