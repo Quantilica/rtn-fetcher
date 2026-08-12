@@ -25,7 +25,11 @@ from .table import Matrix, Tbl
 
 
 def deduplicate_account_rows(account_rows: list[list[Any]]) -> None:
-    """Make repeated account codes unique preserving first occurrences."""
+    """Make repeated account codes unique preserving first occurrences.
+
+    Args:
+        account_rows: List containing [account_codes, account_names, account_levels].
+    """
     seen: dict[str, int] = {}
 
     for index, account_code in enumerate(account_rows[0][1:], start=1):
@@ -209,7 +213,15 @@ def build_account_data_from_columns(
     code_cells: list[Cell],
     name_cells: list[Cell],
 ) -> Tbl:
-    """Build hierarchical account data from separate code and name columns."""
+    """Build hierarchical account data from separate code and name columns.
+
+    Args:
+        code_cells: List of Excel cells containing account codes.
+        name_cells: List of Excel cells containing account names.
+
+    Returns:
+        Table containing the structured hierarchical account data.
+    """
     account_rows: list[list[Any]] = [
         ["account_code"],
         ["account_name"],

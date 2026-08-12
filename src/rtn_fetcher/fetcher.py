@@ -32,7 +32,11 @@ DATASET_ID = "rtn"
 
 
 def fetch_publications_metadata() -> str:
-    """Fetch RTN publications metadata from API."""
+    """Fetch RTN publications metadata from API.
+
+    Returns:
+        HTML string containing the publications metadata.
+    """
     params = {"pageSize": "9999999"}
     with log_step(logger, "fetch-rtn-metadata"):
         return client.get_text(RTN_API_BASE_URL, params=params)
@@ -43,6 +47,12 @@ def generate_filename(modified_date: dt.datetime) -> str:
 
     Returns ``rtn@YYYYMMDDTHHMMSS.xlsx`` using the upstream Last-Modified
     timestamp so each new version produces a distinct local file.
+
+    Args:
+        modified_date: The last modified datetime from the upstream server.
+
+    Returns:
+        Generated filename string.
     """
     return stamp_filename("rtn", "xlsx", modified_date, precision="datetime")
 
@@ -53,6 +63,15 @@ def download_latest_file(destination_dir: Path) -> Path:
     The filename embeds the remote ``Last-Modified`` timestamp, so each new
     upstream version produces a distinct local file. Returns the local path;
     if the file already exists locally, the download is skipped.
+
+    Args:
+        destination_dir: Directory where the file should be downloaded.
+
+    Returns:
+        Path to the downloaded or existing local file.
+
+    Raises:
+        ParseError: If the server response lacks a Last-Modified header or it's invalid.
     """
     params = {"conteudo": "cdn"}
 
@@ -99,6 +118,12 @@ async def download_publication_link(
     asset (PDF, XLSX, etc.) inside an ``<iframe>``. This helper follows that
     one extra hop transparently and writes the final bytes (or HTML) to
     ``dest_file`` atomically.
+
+    Args:
+        client: Async HTTP client instance.
+        url: URL of the publication link.
+        dest_file: Destination path to save the file.
+        text_encoding: Encoding to use if the response is text.
     """
     response = await client.get(url)
     content_type = response.headers.get("Content-Type", "")
@@ -126,7 +151,14 @@ def download_publication_link_sync(
     *,
     text_encoding: str = "utf-8",
 ) -> None:
-    """Download an RTN publication link, following iframe wrappers (synchronous)."""
+    """Download an RTN publication link, following iframe wrappers (synchronous).
+
+    Args:
+        client: HTTP client instance.
+        url: URL of the publication link.
+        dest_file: Destination path to save the file.
+        text_encoding: Encoding to use if the response is text.
+    """
     response = client.get(url)
     content_type = response.headers.get("Content-Type", "")
 

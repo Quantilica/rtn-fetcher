@@ -19,7 +19,15 @@ class DataRepository(BaseDataRepository):
         *,
         last_modified: dt.date | None = None,
     ) -> Path:
-        """Compute the local path for a dataset entry."""
+        """Compute the local path for a dataset entry.
+
+        Args:
+            entry: Dataset entry dictionary containing metadata.
+            last_modified: Optional last modified date.
+
+        Returns:
+            Computed local file path.
+        """
         ano = entry.get("ano_publicacao")
         mes = entry.get("mes_publicacao")
         filename = entry.get("filename", "unknown.xlsx")

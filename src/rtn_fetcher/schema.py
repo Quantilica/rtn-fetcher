@@ -27,6 +27,13 @@ def build_contract(
     The contract reflects the long-format schema produced by
     ``read_sheet_data``: a period column set (year, plus month or quarter
     when applicable), the account identifier, and the value.
+
+    Args:
+        sheet_name: Name of the RTN sheet.
+        sheet_config: Configuration dict for the sheet.
+
+    Returns:
+        DataContract object reflecting the expected output schema.
     """
     period = sheet_config["period"]
 

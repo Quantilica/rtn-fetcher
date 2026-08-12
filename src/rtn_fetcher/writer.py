@@ -29,6 +29,16 @@ def write_table_to_parquet(
 
     The output is cast to the contract derived from ``SHEET_CONFIGS``
     and the manifest's provenance is embedded in the Parquet header.
+
+    Args:
+        data: The Tbl object containing data to write.
+        filepath: Destination Parquet file path.
+        sheet_name: Name of the RTN sheet.
+        manifest: Optional download manifest for provenance.
+        compression: Compression algorithm to use.
+
+    Returns:
+        Path to the written Parquet file.
     """
     if sheet_name not in SHEET_CONFIGS:
         available = ", ".join(SHEET_CONFIGS.keys())

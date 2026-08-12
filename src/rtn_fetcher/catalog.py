@@ -18,7 +18,17 @@ GROUP_ALIASES: dict[str, list[str]] = {}
 
 
 def list_datasets(group: str | None = None) -> list[dict[str, Any]]:
-    """Return all dataset entries, optionally filtered by group."""
+    """Return all dataset entries, optionally filtered by group.
+
+    Args:
+        group: Optional group name to filter datasets.
+
+    Returns:
+        List of dataset entry dictionaries.
+
+    Raises:
+        ValueError: If an unknown group is provided.
+    """
     if group is not None and group != "rtn":
         raise ValueError(f"Unknown group: {group!r}")
 

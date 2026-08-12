@@ -66,7 +66,15 @@ def convert_to_millions(value: Any) -> int | None:
 
 
 def convert_value(value: Any, multiplier: int = 1) -> int | float | str | None:
-    """Normalize spreadsheet values and apply the unit multiplier."""
+    """Normalize spreadsheet values and apply the unit multiplier.
+
+    Args:
+        value: Value to convert.
+        multiplier: Multiplier to apply to numeric values.
+
+    Returns:
+        Normalized value.
+    """
     if value is None:
         return None
 
@@ -108,7 +116,15 @@ def split_date_column(data: Tbl, column_name: str) -> Tbl:
 
 
 def split_quarter_column(data: Tbl, column_name: str) -> Tbl:
-    """Split quarter labels like "2024-I" into year and quarter columns."""
+    """Split quarter labels like "2024-I" into year and quarter columns.
+
+    Args:
+        data: Table with quarter column.
+        column_name: Name of the quarter column to split.
+
+    Returns:
+        Table with quarter column split into year and quarter.
+    """
     new_data = data.data.copy()
     header = get_header(new_data)
     column_index = header.index(column_name)
@@ -128,7 +144,17 @@ def split_quarter_column(data: Tbl, column_name: str) -> Tbl:
 
 
 def parse_quarter(value: Any) -> tuple[int, int]:
-    """Parse RTN quarter labels such as "2024-I" or "2024-1"."""
+    """Parse RTN quarter labels such as "2024-I" or "2024-1".
+
+    Args:
+        value: Quarter label string.
+
+    Returns:
+        Tuple of (year, quarter).
+
+    Raises:
+        ParseError: If the quarter label format is invalid.
+    """
     match = QUARTER_PATTERN.match(str(value).strip())
     if not match:
         raise ParseError(f"Invalid quarterly period: {value!r}")
@@ -143,7 +169,15 @@ def parse_quarter(value: Any) -> tuple[int, int]:
 
 
 def is_period_value(value: Any, period: PeriodType) -> bool:
-    """Return whether a cell value looks like a period header."""
+    """Return whether a cell value looks like a period header.
+
+    Args:
+        value: Cell value to check.
+        period: Period type ("monthly", "yearly", or "quarterly").
+
+    Returns:
+        True if the value matches the period type format.
+    """
     if period == "monthly":
         return isinstance(value, date | datetime)
     if period == "yearly":
@@ -159,7 +193,19 @@ def is_period_value(value: Any, period: PeriodType) -> bool:
 
 
 def find_header_row(sheet: Sheet, period: PeriodType, account_columns: int) -> int:
-    """Find the row containing the period headers."""
+    """Find the row containing the period headers.
+
+    Args:
+        sheet: Excel worksheet.
+        period: Expected period type.
+        account_columns: Number of leading columns before periods.
+
+    Returns:
+        Row index of the header row (1-indexed).
+
+    Raises:
+        ParseError: If no header row is found.
+    """
     period_start_index = account_columns
 
     for row in sheet.iter_rows():
@@ -179,7 +225,20 @@ def find_period_bounds(
     period: PeriodType,
     account_columns: int,
 ) -> tuple[int, int]:
-    """Find the first and last columns containing period headers."""
+    """Find the first and last columns containing period headers.
+
+    Args:
+        sheet: Excel worksheet.
+        header_row: Row index of the header.
+        period: Expected period type.
+        account_columns: Number of leading columns.
+
+    Returns:
+        Tuple of (first_column, last_column) indices.
+
+    Raises:
+        ParseError: If period columns cannot be found.
+    """
     first_period_col = account_columns + 1
     period_columns = []
 
@@ -197,7 +256,15 @@ def find_period_bounds(
 
 
 def is_metadata_row(row: list[Any], account_columns: int) -> bool:
-    """Identify note/source/section-header rows that are not observations."""
+    """Identify note/source/section-header rows that are not observations.
+
+    Args:
+        row: Row data as a list of cells or values.
+        account_columns: Number of leading columns for accounts.
+
+    Returns:
+        True if the row is metadata.
+    """
     account_values = [cell.value for cell in row[:account_columns]]
     account_text = " ".join(str(value).strip() for value in account_values if value)
     account_text_lower = account_text.casefold()
@@ -225,7 +292,19 @@ def extract_data_rows(
     period: PeriodType,
     account_columns: int,
 ) -> list[list[Any]]:
-    """Extract the header row and data rows for a configured RTN sheet."""
+    """Extract the header row and data rows for a configured RTN sheet.
+
+    Args:
+        sheet: Excel worksheet.
+        period: Period type.
+        account_columns: Number of leading columns.
+
+    Returns:
+        List of data rows including header row.
+
+    Raises:
+        ParseError: If no data rows can be found.
+    """
     header_row = find_header_row(sheet, period, account_columns)
     _, last_period_col = find_period_bounds(
         sheet=sheet,
@@ -258,7 +337,14 @@ def extract_data_rows(
 
 
 def detect_value_multiplier(sheet: Sheet) -> int:
-    """Infer whether values should be converted from R$ millions to reais."""
+    """Infer whether values should be converted from R$ millions to reais.
+
+    Args:
+        sheet: Excel worksheet.
+
+    Returns:
+        Multiplier value (e.g. 1,000,000 or 1).
+    """
     unit_text = str(sheet.cell(3, 1).value or "").casefold()
     if "r$" in unit_text and "milh" in unit_text:
         return MILLION_MULTIPLIER
@@ -269,7 +355,15 @@ def build_wide_table(
     rows: list[list[Any]],
     account_columns: int,
 ) -> tuple[Tbl, Tbl]:
-    """Build a wide table and account hierarchy from worksheet rows."""
+    """Build a wide table and account hierarchy from worksheet rows.
+
+    Args:
+        rows: Extracted rows from the worksheet.
+        account_columns: Number of leading account columns.
+
+    Returns:
+        Tuple of (wide_data_table, account_hierarchy_table).
+    """
     if account_columns == 1:
         raw_data = Tbl(rows)
         raw_data.data[0][0] = DATE_COLUMN
@@ -346,7 +440,18 @@ def read_sheet_data(
 
 
 def read_sheet(filepath: Path, sheet_name: str) -> tuple[Tbl, Tbl]:
-    """Read a specific sheet from RTN Excel file."""
+    """Read a specific sheet from RTN Excel file.
+
+    Args:
+        filepath: Path to the Excel file.
+        sheet_name: Name of the sheet to read.
+
+    Returns:
+        Tuple of (data_table, account_hierarchy_table).
+
+    Raises:
+        ParseError: If the sheet name is unknown.
+    """
     if sheet_name not in SHEET_CONFIGS:
         available_sheets = ", ".join(SHEET_CONFIGS.keys())
         raise ParseError(f"Unknown sheet '{sheet_name}'. Available: {available_sheets}")
@@ -357,7 +462,15 @@ def read_sheet(filepath: Path, sheet_name: str) -> tuple[Tbl, Tbl]:
 
 
 def read_workbook_sheet(workbook: Any, sheet_name: str) -> tuple[Tbl, Tbl]:
-    """Read a configured sheet from an already opened workbook."""
+    """Read a configured sheet from an already opened workbook.
+
+    Args:
+        workbook: Opened Excel workbook object.
+        sheet_name: Name of the sheet to read.
+
+    Returns:
+        Tuple of (data_table, account_hierarchy_table).
+    """
     config = SHEET_CONFIGS[sheet_name]
     sheet = workbook[sheet_name]
 

@@ -59,7 +59,14 @@ def _looks_like_account_code(code: str) -> bool:
 
 
 def normalize_account_code(code: Any) -> str:
-    """Normalize account code to package hierarchy separator."""
+    """Normalize account code to package hierarchy separator.
+
+    Args:
+        code: Raw account code value.
+
+    Returns:
+        Normalized account code string.
+    """
     if code is None:
         return ""
 
@@ -83,7 +90,14 @@ def normalize_account_code(code: Any) -> str:
 
 
 def generated_account_code(parts: tuple[int, ...]) -> str:
-    """Build a non-colliding generated code for rows without explicit codes."""
+    """Build a non-colliding generated code for rows without explicit codes.
+
+    Args:
+        parts: Tuple of hierarchy level parts.
+
+    Returns:
+        Generated account code string.
+    """
     generated_parts = (AUTO_ACCOUNT_PREFIX, *(str(part) for part in parts))
     return HIERARCHY_SEPARATOR.join(generated_parts)
 
