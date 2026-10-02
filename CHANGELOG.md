@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.4.2] - 2026-10-02
+
+### Alterado
+- Alinhamento com as dependências canônicas do ecossistema: `quantilica-core` atualizada para `>=0.8.0` e `quantilica-analytics` (extra `analysis`) para `>=0.3.0`.
+- Gravação Parquet (`write_table_to_parquet`) operando com escrita atômica (arquivo temporário seguido de `os.replace`) e proveniência de manifest persistida em metadados `quantilica.*` do arquivo e em sidecar JSON padronizado (`<target>.manifest.json`) fornecidos por `quantilica.analytics.writer.to_parquet`.
+
 ## [0.4.1] - 2026-10-02
 
 ### Corrigido
