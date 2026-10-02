@@ -1,6 +1,6 @@
 [project]
 name = "rtn-fetcher"
-version = "0.4.0"
+version = "0.4.1"
 description = "RTN data fetching and export utilities"
 readme = "README.md"
 authors = [
