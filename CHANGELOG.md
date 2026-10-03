@@ -1,5 +1,10 @@
 # Changelog
 
+## [Não lançado]
+
+### Alterado
+- Substituição da instância global de `HttpClient` em `fetcher.py` por factory lazy `_get_client()`, evitando inicialização antecipada de sockets.
+
 ## [0.4.2] - 2026-10-02
 
 ### Alterado
