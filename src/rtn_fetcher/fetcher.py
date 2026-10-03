@@ -25,7 +25,23 @@ from .constants import (
 )
 
 logger = get_logger(__name__)
-client = HttpClient(timeout=60.0)
+_client: HttpClient | None = None
+
+
+def _get_client() -> HttpClient:
+    """Return the shared HTTP client, creating it lazily on first use.
+
+    Avoids instantiating the client (and its connection pool) at module
+    import time; the instance is reused across calls for keep-alive.
+
+    Returns:
+        HttpClient: The shared client instance.
+    """
+    global _client
+    if _client is None:
+        _client = HttpClient(timeout=60.0)
+    return _client
+
 
 SOURCE_ID = "tesouro-nacional"
 DATASET_ID = "rtn"
@@ -38,6 +54,7 @@ def fetch_publications_metadata() -> str:
         HTML string containing the publications metadata.
     """
     params = {"pageSize": "9999999"}
+    client = _get_client()
     with log_step(logger, "fetch-rtn-metadata"):
         return client.get_text(RTN_API_BASE_URL, params=params)
 
@@ -74,6 +91,7 @@ def download_latest_file(destination_dir: Path) -> Path:
         ParseError: If the server response lacks a Last-Modified header or it's invalid.
     """
     params = {"conteudo": "cdn"}
+    client = _get_client()
 
     with log_step(logger, "download-rtn-file"):
         head = client.head_or_get(RTN_FILE_BASE_URL, params=params)
