@@ -5,6 +5,11 @@ Todas as mudanças notáveis deste projeto serão documentadas neste arquivo.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/),
 e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [0.5.1] - 2026-10-20
+
+### Corrigido
+- Sem o extra `analysis`, importar `rtn_fetcher.schema` ou `rtn_fetcher.writer` levantava `ModuleNotFoundError` cru de `polars`/`quantilica.analytics`; agora levanta `ImportError` com a instrução `uv add 'rtn-fetcher[analysis]' --index https://index.quantilica.com/simple/`. `Tbl.to_polars()` e `dataframe.to_polars()` dão a mesma orientação. `reader`, `fetcher` e `constants` continuam sem exigir o extra.
+
 ## [0.5.0] - 2026-10-20
 
 ### Alterado
