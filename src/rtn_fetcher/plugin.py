@@ -8,7 +8,12 @@ from typing import Any
 
 from quantilica.cli.sdk import FetcherApp
 
-from .catalog import GROUP_ALIASES, GROUPS, list_datasets
+from .catalog import (
+    GROUP_ALIASES,
+    GROUPS,
+    list_datasets,
+    resolve_groups_with_default,
+)
 from .storage import DataRepository
 
 
@@ -30,11 +35,18 @@ def path_builder(
 
 fetcher = FetcherApp(
     name="rtn-fetcher",
-    help="Resultado do Tesouro Nacional (RTN).",
+    help=(
+        "Resultado do Tesouro Nacional (RTN). Sem grupo, sync/check usam só "
+        "'rtn' (planilhas da série histórica); peça 'rtn-anexos', "
+        "'rtn-publicacoes', 'planilhas' ou 'todos' para incluir o resto."
+    ),
     groups_dict=GROUPS,
     aliases_dict=GROUP_ALIASES,
     list_datasets=list_datasets,
     path_builder=path_builder,
 )
+# Sem grupo explícito, sync/check usam só a série histórica (o SDK expandiria
+# para todos os grupos: ~2.000 arquivos, incluindo PDFs e GIFs desde 1995).
+fetcher.resolve_groups = resolve_groups_with_default(fetcher.resolve_groups)
 
 app = fetcher.app
