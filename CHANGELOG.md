@@ -5,13 +5,21 @@ Todas as mudanças notáveis deste projeto serão documentadas neste arquivo.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/),
 e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
-## [Não lançado]
+## [0.4.3] - 2026-10-20
+
+### Corrigido
+- `src/rtn_fetcher/py.typed` esvaziado conforme PEP 561.
+- `pyproject.toml`: extra `analysis` declara `polars>=1.0.0` explicitamente.
 
 ### Alterado
 - `cli.py` protege o import do plugin; sem o host a CLI standalone sai com código 1 e orienta `quantilica install rtn`.
 - Substituição da instância global de `HttpClient` em `fetcher.py` por factory lazy `_get_client()`, evitando inicialização antecipada de sockets.
 
 ## [0.4.2] - 2026-10-02
+
+### Corrigido
+- `src/rtn_fetcher/py.typed` esvaziado conforme PEP 561.
+- `pyproject.toml`: extra `analysis` declara `polars>=1.0.0` explicitamente.
 
 ### Alterado
 - Alinhamento com as dependências canônicas do ecossistema: `quantilica-core` atualizada para `>=0.8.0` e `quantilica-analytics` (extra `analysis`) para `>=0.3.0`.
@@ -23,6 +31,10 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 - Remoção da diretiva legada `[tool.hatch.metadata] allow-direct-references = true` em `pyproject.toml` para conformidade estrita com o padrão de publicação PEP 503.
 
 ## [0.4.0] - 2026-08-07
+### Corrigido
+- `src/rtn_fetcher/py.typed` esvaziado conforme PEP 561.
+- `pyproject.toml`: extra `analysis` declara `polars>=1.0.0` explicitamente.
+
 ### Alterado
 - Refatoração arquitetural: Remoção de dependências (`quantilica-cli` e `quantilica-catalog`) e limpeza de imports. Os fetchers agora são pacotes de extração puros, dependendo estritamente do `quantilica-core`.
 
