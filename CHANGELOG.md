@@ -5,6 +5,16 @@ Todas as mudanças notáveis deste projeto serão documentadas neste arquivo.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/),
 e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [0.5.0] - 2026-10-20
+
+### Alterado
+- Catálogo dividido em três grupos: `rtn` (planilhas `serie_historica_*` `.xlsx`/`.csv`), `rtn-anexos` (demais planilhas: Anexos RTN e tabelas `.xls` de 1996 a 2014) e `rtn-publicacoes` (PDF, GIF, DOC, PPT e links), com os aliases `planilhas` (`rtn` + `rtn-anexos`) e `todos`. `sync` e `check` sem grupo usam só `rtn` (87 arquivos em 2026-10-20, contra 2.074 antes); para baixar o resto, passe o grupo ou alias (`quantilica rtn sync todos`). `list_datasets("rtn")` passa a devolver só a série histórica; `list_datasets()` continua devolvendo tudo.
+- A página de publicações é baixada uma vez por processo (cache de 5 minutos; `catalog.clear_cache()` força nova leitura): `rtn list` fazia o download duas vezes por grupo.
+
+### Corrigido
+- A conta "10. RESULTADO NOMINAL DO GOVERNO CENTRAL" das abas 1.1, 1.1-A, 1.2, 1.2-A, 1.2-B, 2.1, 2.1-A, 2.2 e 2.2-A era lida com código `1.0`, nível 2, filha de "9 JUROS NOMINAIS". Códigos embutidos no rótulo não são mais quebrados dígito a dígito (`normalize_account_code(..., compact=False)`), então ela passa a ter código `10` e nível 1. Os códigos compactos da coluna de código das abas 4.1/4.2 (`111` -> `1.1.1`, `2M` -> `2.M`) não mudam. Consumidores que guardam contas pelo código (ex.: importador do `quantilica-workers`) passam a ver `10` no lugar de `1.0`.
+- Links sem extensão na página de publicações (ex.: "API pública") recebiam `ext` `xlsx`; agora ficam em `rtn-publicacoes` com `ext` `html`.
+
 ## [0.4.3] - 2026-10-20
 
 ### Corrigido
@@ -14,12 +24,6 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 ### Alterado
 - `cli.py` protege o import do plugin; sem o host a CLI standalone sai com código 1 e orienta `quantilica install rtn`.
 - Substituição da instância global de `HttpClient` em `fetcher.py` por factory lazy `_get_client()`, evitando inicialização antecipada de sockets.
-- Catálogo dividido em três grupos: `rtn` (planilhas `serie_historica_*` `.xlsx`/`.csv`), `rtn-anexos` (demais planilhas: Anexos RTN e tabelas `.xls` de 1996 a 2014) e `rtn-publicacoes` (PDF, GIF, DOC, PPT e links), com os aliases `planilhas` (`rtn` + `rtn-anexos`) e `todos`. `sync` e `check` sem grupo usam só `rtn` (87 arquivos em 2026-10-20, contra 2.074 antes); para baixar o resto, passe o grupo ou alias (`quantilica rtn sync todos`). `list_datasets("rtn")` passa a devolver só a série histórica; `list_datasets()` continua devolvendo tudo.
-- A página de publicações é baixada uma vez por processo (cache de 5 minutos; `catalog.clear_cache()` força nova leitura): `rtn list` fazia o download duas vezes por grupo.
-
-### Corrigido
-- A conta "10. RESULTADO NOMINAL DO GOVERNO CENTRAL" das abas 1.1, 1.1-A, 1.2, 1.2-A, 1.2-B, 2.1, 2.1-A, 2.2 e 2.2-A era lida com código `1.0`, nível 2, filha de "9 JUROS NOMINAIS". Códigos embutidos no rótulo não são mais quebrados dígito a dígito (`normalize_account_code(..., compact=False)`), então ela passa a ter código `10` e nível 1. Os códigos compactos da coluna de código das abas 4.1/4.2 (`111` -> `1.1.1`, `2M` -> `2.M`) não mudam. Consumidores que guardam contas pelo código (ex.: importador do `quantilica-workers`) passam a ver `10` no lugar de `1.0`.
-- Links sem extensão na página de publicações (ex.: "API pública") recebiam `ext` `xlsx`; agora ficam em `rtn-publicacoes` com `ext` `html`.
 
 ## [0.4.2] - 2026-10-02
 
