@@ -58,11 +58,17 @@ def _looks_like_account_code(code: str) -> bool:
     )
 
 
-def normalize_account_code(code: Any) -> str:
+def normalize_account_code(code: Any, *, compact: bool = True) -> str:
     """Normalize account code to package hierarchy separator.
 
     Args:
         code: Raw account code value.
+        compact: Whether dotless multi-character codes are *compact* GFS codes
+            (one character per level: ``111`` -> ``1.1.1``, ``2M`` -> ``2.M``),
+            as in the separate code column of sheets 4.1/4.2. Codes embedded in
+            the account label (sheets 1.x/2.x, e.g. ``"10. RESULTADO
+            NOMINAL"``) are not compact: ``10`` is a top-level account, not
+            ``1.0``, so callers parsing labels pass ``compact=False``.
 
     Returns:
         Normalized account code string.
@@ -79,6 +85,8 @@ def normalize_account_code(code: Any) -> str:
 
     if ACCOUNT_SEPARATOR in text:
         parts = [part for part in text.split(ACCOUNT_SEPARATOR) if part]
+    elif not compact:
+        parts = [text]
     elif text.isdigit() and len(text) > 1:
         parts = list(text)
     elif re.fullmatch(r"\d+[A-Za-z]", text):
@@ -117,7 +125,9 @@ def parse_account_name(name: str) -> tuple[str, str]:
 
     Examples:
         >>> parse_account_name("1.2.3 Receitas Correntes")
-        ('1=>2=>3', 'Receitas Correntes')
+        ('1.2.3', 'Receitas Correntes')
+        >>> parse_account_name("10. RESULTADO NOMINAL")
+        ('10', 'RESULTADO NOMINAL')
         >>> parse_account_name("Outras Receitas")
         ('', 'Outras Receitas')
     """
@@ -129,7 +139,8 @@ def parse_account_name(name: str) -> tuple[str, str]:
         account_code = match.group(1).strip()
 
     account_name = clean_account_name(name[match.end() :] if account_code else name)
-    account_code = normalize_account_code(account_code)
+    # Código embutido no rótulo: "10." é a conta de nível 1 "10", não "1.0".
+    account_code = normalize_account_code(account_code, compact=False)
 
     return account_code, account_name
 
