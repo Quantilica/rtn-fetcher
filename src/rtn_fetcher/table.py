@@ -162,7 +162,14 @@ class Tbl:
         Returns:
             polars DataFrame with same data and column names.
         """
-        import polars as pl
+        try:
+            import polars as pl
+        except ImportError as exc:
+            raise ImportError(
+                "rtn_fetcher.table.Tbl.to_polars requer o extra 'analysis': "
+                "uv add 'rtn-fetcher[analysis]' "
+                "--index https://index.quantilica.com/simple/"
+            ) from exc
 
         header = self.get_header()
         columns = {

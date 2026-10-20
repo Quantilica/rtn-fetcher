@@ -26,7 +26,14 @@ def to_polars(tbl: Tbl) -> "pl.DataFrame":
         >>> df = to_polars(data)
         >>> df.head()
     """
-    import polars as pl
+    try:
+        import polars as pl
+    except ImportError as exc:
+        raise ImportError(
+            "rtn_fetcher.dataframe.to_polars requer o extra 'analysis': "
+            "uv add 'rtn-fetcher[analysis]' "
+            "--index https://index.quantilica.com/simple/"
+        ) from exc
 
     header = tbl.get_header()
     columns = {

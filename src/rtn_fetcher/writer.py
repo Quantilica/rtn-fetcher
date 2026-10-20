@@ -8,7 +8,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from quantilica.analytics.writer import to_parquet
+try:
+    from quantilica.analytics.writer import to_parquet
+except ImportError as exc:
+    raise ImportError(
+        "rtn_fetcher.writer requer o extra 'analysis': "
+        "uv add 'rtn-fetcher[analysis]' "
+        "--index https://index.quantilica.com/simple/"
+    ) from exc
 from quantilica.core.manifests import DownloadManifest
 
 from .constants import SHEET_CONFIGS

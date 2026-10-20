@@ -6,8 +6,15 @@ that Parquet outputs can be cast and validated against a known schema.
 
 from __future__ import annotations
 
-import polars as pl
-from quantilica.analytics.schema import DataContract, Field
+try:
+    import polars as pl
+    from quantilica.analytics.schema import DataContract, Field
+except ImportError as exc:
+    raise ImportError(
+        "rtn_fetcher.schema requer o extra 'analysis': "
+        "uv add 'rtn-fetcher[analysis]' "
+        "--index https://index.quantilica.com/simple/"
+    ) from exc
 
 from .constants import (
     ACCOUNT_COLUMN,
