@@ -17,7 +17,7 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 - A página de publicações é baixada uma vez por processo (cache de 5 minutos; `catalog.clear_cache()` força nova leitura): `rtn list` fazia o download duas vezes por grupo.
 
 ### Corrigido
-- A conta "10. RESULTADO NOMINAL DO GOVERNO CENTRAL" das abas 1.1, 1.1-A, 1.2, 1.2-A, 1.2-B, 2.1, 2.1-A, 2.2 e 2.2-A era lida com código `1.0`, nível 2, filha de "9 JUROS NOMINAIS". Códigos embutidos no rótulo não são mais quebrados dígito a dígito (`normalize_account_code(..., compact=False)`), então ela passa a ter código `10` e nível 1. Os códigos compactos da coluna de código das abas 4.1/4.2 (`111` -> `1.1.1`, `2M` -> `2.M`) não mudam. Consumidores que guardam contas pelo código (ex.: importador do `quantilica-workers`) passam a ver `10` no lugar de `1.0`.
+- A conta "10. RESULTADO NOMINAL DO GOVERNO CENTRAL" das abas 1.1, 1.1-A, 1.2, 1.2-A, 1.2-B, 2.1, 2.1-A, 2.2 e 2.2-A era lida com código `1.0`, nível 2, filha de "9 JUROS NOMINAIS". Códigos embutidos no rótulo não são mais quebrados dígito a dígito (`normalize_account_code(..., compact=False)`), então ela passa a ter código `10` e nível 1. Os códigos compactos da coluna de código das abas 4.1/4.2 (`111` -> `1.1.1`, `2M` -> `2.M`) não mudam. Consumidores que guardam contas pelo código (ex.: importadores que guardam o código da conta) passam a ver `10` no lugar de `1.0`.
 - Links sem extensão na página de publicações (ex.: "API pública") recebiam `ext` `xlsx`; agora ficam em `rtn-publicacoes` com `ext` `html`.
 
 ## [0.4.3] - 2026-10-20
