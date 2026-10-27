@@ -1,6 +1,6 @@
 [project]
 name = "rtn-fetcher"
-version = "0.5.1"
+version = "0.6.0"
 description = "RTN data fetching and export utilities"
 readme = "README.md"
 authors = [
@@ -36,7 +36,7 @@ dependencies = [
 [project.optional-dependencies]
 analysis = [
     "polars>=1.0.0",
-    "quantilica-analytics>=0.3.0",
+    "quantilica-analytics>=0.8.0",
 ]
 
 [project.urls]
@@ -49,6 +49,9 @@ rtn-fetcher = "rtn_fetcher.cli:main"
 
 [project.entry-points."quantilica.fetchers"]
 rtn = "rtn_fetcher.plugin:app"
+
+[project.entry-points."quantilica.lake"]
+rtn = "rtn_fetcher.lake:converter"
 
 [dependency-groups]
 dev = [

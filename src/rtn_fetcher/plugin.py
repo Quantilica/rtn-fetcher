@@ -49,4 +49,21 @@ fetcher = FetcherApp(
 # para todos os grupos: ~2.000 arquivos, incluindo PDFs e GIFs desde 1995).
 fetcher.resolve_groups = resolve_groups_with_default(fetcher.resolve_groups)
 
+
+def convert(
+    input_dir: Path,
+    lake_dir: Path,
+    *,
+    dataset: list[str] | None = None,
+    force: bool = False,
+) -> Any:
+    """Converte arquivos brutos do RTN para o lake Hive (Parquet)."""
+    from rtn_fetcher import lake
+
+    return lake.converter.convert(input_dir, lake_dir, datasets=dataset, force=force)
+
+
+fetcher.command_convert(convert)
+fetcher.command_pipeline(convert)
+
 app = fetcher.app
