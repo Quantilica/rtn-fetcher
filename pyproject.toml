@@ -36,7 +36,7 @@ dependencies = [
 [project.optional-dependencies]
 analysis = [
     "polars>=1.0.0",
-    "quantilica-analytics>=0.8.0",
+    "quantilica-analytics>=0.5.0",
 ]
 
 [project.urls]
@@ -60,7 +60,7 @@ dev = [
     # Só para os testes: tests/test_catalog.py exercita o plugin Typer do
     # host (sync --dry-run). Nunca em [project].dependencies — o plugin
     # consome o que o host já traz.
-    "quantilica-cli>=0.10.0",
+    "quantilica-cli>=0.13.0",
 ]
 
 [tool.pytest.ini_options]
