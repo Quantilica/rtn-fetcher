@@ -119,3 +119,19 @@ def test_cli_convert(tmp_path: Path) -> None:
     )
     assert result.exit_code == 0, result.output
     assert (lake_dir / SOURCE_ID / "tabela-1-2-b").exists()
+
+
+def test_latest_workbook_prefers_newest_series(tmp_path: Path) -> None:
+    from rtn_fetcher.lake import latest_workbook
+
+    for rel in (
+        "2015-03/Anexos RTN mar_2015.xlsx",
+        "2026-07/serie_historica_jul26.xlsx",
+        "2026-08/serie_historica_ago26.xlsx",
+        "2026-08/~$serie_historica_ago26.xlsx",
+        "2026-09/Anexo avulso.xlsx",
+    ):
+        (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / rel).write_bytes(b"")
+    assert [p.name for p in latest_workbook(tmp_path)] == ["serie_historica_ago26.xlsx"]
+    assert latest_workbook(tmp_path / "vazio") == []

@@ -53,6 +53,22 @@ class ConvertResult:
     errors: list[str] = field(default_factory=list)
 
 
+def latest_workbook(input_dir: Path) -> list[Path]:
+    """A série histórica mais recente (uma lista vazia ou de um item).
+
+    Cada série histórica mensal traz o histórico inteiro, e cada aba vira um Parquet
+    de chave fixa: converter todas as pastas só refazia o trabalho, e os layouts
+    antigos (anexos de 1995 a 2022) falhavam. Vale a mais recente pela pasta do
+    mês; os arquivos ``serie_historica*`` têm preferência sobre os anexos.
+    """
+    workbooks = sorted(
+        p for p in Path(input_dir).rglob("*.xlsx") if not p.name.startswith("~$")
+    )
+    series = [p for p in workbooks if p.name.lower().startswith("serie_historica")]
+    chosen = series or workbooks
+    return chosen[-1:]
+
+
 class LakeConverter:
     """Converter registered under the ``quantilica.lake`` entry point."""
 
@@ -100,13 +116,10 @@ class LakeConverter:
             if result.errors:
                 return result
 
-        workbooks = sorted(
-            p for p in input_dir.rglob("*.xlsx") if not p.name.startswith("~$")
-        )
+        workbooks = latest_workbook(input_dir)
         if not workbooks:
             return result
 
-        # Convert latest or matching workbooks
         for path in workbooks:
             try:
                 wb = open_workbook(path)
