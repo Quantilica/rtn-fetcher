@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 try:
     import polars as pl
@@ -24,11 +25,66 @@ except ImportError as exc:
 from rtn_fetcher import __version__
 from rtn_fetcher.constants import SHEET_CONFIGS
 from rtn_fetcher.dataframe import to_polars
-from rtn_fetcher.excel import open_workbook
+from rtn_fetcher.excel import Workbook, open_workbook
 from rtn_fetcher.reader import read_workbook_sheet
 from rtn_fetcher.schema import build_contract
 
+if TYPE_CHECKING:  # só tipagem: o core publicado antes do contrato não tem Planned
+    from quantilica.core.lake import Planned
+
 SOURCE_ID = "rtn"
+
+# Formatos que o conversor não lê: documentos, imagens e páginas salvas de
+# links. O resto é planilha ou outro dado.
+_NON_TABULAR_SUFFIXES = frozenset(
+    {
+        ".pdf",
+        ".doc",
+        ".docx",
+        ".odt",
+        ".rtf",
+        ".ppt",
+        ".pptx",
+        ".odp",
+        ".gif",
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".bmp",
+        ".tif",
+        ".tiff",
+        ".svg",
+        ".html",
+        ".htm",
+    }
+)
+
+_MANIFEST_SUFFIX = ".manifest.json"
+_TEMP_SUFFIX = ".tmp"
+
+
+def _is_sidecar(path: Path) -> bool:
+    """Se o arquivo é sidecar de manifest ou resto ``.tmp``, não dado bruto."""
+    return path.name.endswith(_MANIFEST_SUFFIX) or path.name.endswith(_TEMP_SUFFIX)
+
+
+def _is_non_tabular(path: Path) -> bool:
+    """Se o conversor não lê o arquivo: documento, imagem, página ou trava do Excel."""
+    return (
+        path.name.startswith("~$")
+        or not path.suffix
+        or path.suffix.lower() in _NON_TABULAR_SUFFIXES
+    )
+
+
+def _base_name(path: Path) -> str:
+    """Nome sem a extensão final, para achar o mesmo conteúdo em outro formato."""
+    return path.stem.casefold()
+
+
+def _is_twin(path: Path, chosen: Path) -> bool:
+    """Se ``path`` é o mesmo conteúdo de ``chosen`` em outro formato."""
+    return path.parent == chosen.parent and _base_name(path) == _base_name(chosen)
 
 
 def sheet_to_dataset_id(sheet_name: str) -> str:
@@ -67,6 +123,16 @@ def latest_workbook(input_dir: Path) -> list[Path]:
     series = [p for p in workbooks if p.name.lower().startswith("serie_historica")]
     chosen = series or workbooks
     return chosen[-1:]
+
+
+def workbook_sheets(workbook: Workbook) -> list[str]:
+    """Abas que ``convert`` lê, na ordem de ``SHEET_CONFIGS``.
+
+    Compartilhada por :meth:`LakeConverter.convert` e
+    :meth:`LakeConverter.inventory`, para o inventário refletir exatamente as
+    abas que o conversor percorre.
+    """
+    return [sheet for sheet in SHEET_CONFIGS if sheet in workbook.sheetnames]
 
 
 class LakeConverter:
@@ -128,10 +194,9 @@ class LakeConverter:
                 continue
 
             sheets_to_process = [
-                s
-                for s in SHEET_CONFIGS
-                if s in wb.sheetnames
-                and (allowed_sheets is None or s in allowed_sheets)
+                sheet
+                for sheet in workbook_sheets(wb)
+                if allowed_sheets is None or sheet in allowed_sheets
             ]
 
             for sheet_name in sheets_to_process:
@@ -176,6 +241,70 @@ class LakeConverter:
                     continue
 
         return result
+
+    def inventory(self, input_dir: Path) -> list[Planned]:
+        """Um ``Planned`` por dataset (ou motivo de ignorar) de cada arquivo.
+
+        Espelha a descoberta de :meth:`convert` (mesma :func:`latest_workbook`
+        e mesmas abas de :func:`workbook_sheets`): só a série histórica mais
+        recente é aberta, e cada aba dela vira um dataset. Os demais arquivos
+        vêm com o motivo de serem ignorados: gêmeo de outro formato da mesma
+        base (``"gemeo"``), documento, imagem ou página (``"nao_tabular"``) e
+        publicação anterior, como as séries de meses passados e os anexos
+        antigos (``"superado"``). Sidecars ``*.manifest.json`` e restos
+        ``*.tmp`` não entram no inventário.
+
+        Uma planilha pode alimentar mais de um dataset (uma aba por tabela),
+        então ela aparece uma vez por dataset que ``convert`` escreveria.
+
+        Args:
+            input_dir: Raiz dos arquivos brutos do RTN (a mesma de ``convert``).
+
+        Returns:
+            list[Planned]: Um item por dataset de cada arquivo, ou um item com
+            o motivo de ignorá-lo.
+        """
+        # Import local: o core publicado antes do contrato não tem ``Planned``.
+        from quantilica.core.lake import Planned
+
+        input_dir = Path(input_dir)
+        if not input_dir.is_dir():
+            return []
+
+        planned: list[Planned] = []
+        workbooks = latest_workbook(input_dir)
+        chosen = workbooks[-1] if workbooks else None
+
+        if chosen is not None:
+            try:
+                workbook = open_workbook(chosen)
+            except Exception:  # o inventário não pode falhar por planilha ilegível
+                workbook = None
+            if workbook is None:
+                # O conversor também não grava nada: fica sem destino para a
+                # auditoria apontar a lacuna em vez de supor um Parquet.
+                planned.append(Planned(chosen))
+            else:
+                try:
+                    for sheet in workbook_sheets(workbook):
+                        planned.append(
+                            Planned(chosen, dataset=sheet_to_dataset_id(sheet))
+                        )
+                finally:
+                    workbook.close()
+
+        for path in sorted(input_dir.rglob("*")):
+            if not path.is_file() or path == chosen or _is_sidecar(path):
+                continue
+            if _is_non_tabular(path):
+                planned.append(Planned(path, skip_reason="nao_tabular"))
+            elif chosen is not None and _is_twin(path, chosen):
+                planned.append(Planned(path, skip_reason="gemeo"))
+            elif chosen is not None:
+                planned.append(Planned(path, skip_reason="superado"))
+            else:
+                planned.append(Planned(path))
+        return planned
 
 
 converter = LakeConverter()

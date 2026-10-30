@@ -5,6 +5,15 @@ Todas as mudanças notáveis deste projeto serão documentadas neste arquivo.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/),
 e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [Não lançado]
+
+### Adicionado
+- `inventory()` no conversor do lake: para cada arquivo bruto da árvore, informa
+  o dataset que ele alimenta ou o motivo de ser ignorado (gêmeo em outro formato,
+  arquivo não tabular ou versão anterior). Uma planilha com várias abas aparece
+  uma vez por dataset que `convert` escreveria. Permite que a auditoria do lake
+  confira a cobertura da fonte sem falsos positivos.
+
 ## [0.6.1] - 2026-10-29
 
 ### Corrigido
