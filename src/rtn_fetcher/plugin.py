@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from quantilica.cli.sdk import FetcherApp
+from quantilica.core.sync import FreshnessPolicy
 
 from .catalog import (
     GROUP_ALIASES,
@@ -44,6 +45,7 @@ fetcher = FetcherApp(
     aliases_dict=GROUP_ALIASES,
     list_datasets=list_datasets,
     path_builder=path_builder,
+    freshness_policy=FreshnessPolicy.REMOTE_ONLY,
 )
 # Sem grupo explícito, sync/check usam só a série histórica (o SDK expandiria
 # para todos os grupos: ~2.000 arquivos, incluindo PDFs e GIFs desde 1995).
