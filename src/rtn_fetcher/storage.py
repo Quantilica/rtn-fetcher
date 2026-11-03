@@ -23,11 +23,9 @@ class DataRepository(BaseDataRepository):
     ) -> Path:
         """Compute the local path for a dataset entry.
 
-        For A7 sources (dynamic export without reliable HTTP metadata), the server
-        doesn't provide Last-Modified/ETag. Per ADR 2026-10-30 (F3: remote_only
-        + CAS sha256), we use the download date as the timestamp so that each
-        sync creates a new @YYYYMMDD version only when content actually changes
-        (download_with_manifest compares sha256 before atomic commit).
+        The stamp is the remote Last-Modified date (F2: HEAD_FALLBACK_GET), so the
+        name stays stable between runs. Only when the server exposes no
+        Last-Modified at all does it fall back to the download date.
         """
         ano = entry.get("ano_publicacao")
         mes = entry.get("mes_publicacao")
