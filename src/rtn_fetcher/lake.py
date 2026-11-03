@@ -120,7 +120,12 @@ def latest_workbook(input_dir: Path) -> list[Path]:
     workbooks = sorted(
         p for p in Path(input_dir).rglob("*.xlsx") if not p.name.startswith("~$")
     )
-    series = [p for p in workbooks if p.name.lower().startswith("serie_historica")]
+    series = [
+        p
+        for p in workbooks
+        if p.name.lower().startswith("serie_historica")
+        or p.name.lower().startswith("rtn_")
+    ]
     chosen = series or workbooks
     return chosen[-1:]
 
