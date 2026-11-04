@@ -45,6 +45,7 @@ fetcher = FetcherApp(
     aliases_dict=GROUP_ALIASES,
     list_datasets=list_datasets,
     path_builder=path_builder,
+    default_output=Path("/data/rtn"),
     freshness_policy=FreshnessPolicy.HEAD_FALLBACK_GET,
 )
 # Sem grupo explícito, sync/check usam só a série histórica (o SDK expandiria
@@ -60,7 +61,13 @@ def convert(
     force: bool = False,
 ) -> Any:
     """Converte arquivos brutos do RTN para o lake Hive (Parquet)."""
-    from rtn_fetcher import lake
+    try:
+        from rtn_fetcher import lake
+    except ImportError as exc:
+        raise ImportError(
+            "Conversão para o lake requer o extra 'analysis'. "
+            "Instale com: quantilica install rtn --extra analysis"
+        ) from exc
 
     return lake.converter.convert(input_dir, lake_dir, datasets=dataset, force=force)
 
