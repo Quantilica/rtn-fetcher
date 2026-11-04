@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 try:
     import polars as pl
     from quantilica.analytics.lake import LakeError, LakeWriter
-    from quantilica.core.lake import DatasetDescriptor
+    from quantilica.core.lake import DatasetDescriptor, partition_types_for
 except ImportError as exc:
     raise ImportError(
         "rtn_fetcher.lake requer o extra 'analysis': "
@@ -213,7 +213,7 @@ class LakeConverter:
                         dataset_id=dataset_id,
                         alias=sheet_name,
                         partition_keys=[],
-                        partition_types={},
+                        partition_types=partition_types_for([]),
                     ),
                     force=force,
                 )
