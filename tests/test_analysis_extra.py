@@ -12,7 +12,6 @@ from rtn_fetcher.table import Tbl
 
 MODULES = [
     "rtn_fetcher.schema",
-    "rtn_fetcher.writer",
 ]
 
 ANALYTICS = (
@@ -94,7 +93,6 @@ def test_api_basica_importa_sem_extra_analysis():
         assert callable(download_latest_file)
         assert callable(read_all_sheets)
         assert rtn_fetcher._HAS_ANALYSIS is False
-        assert rtn_fetcher.write_table_to_parquet is None
         """
     )
     result = subprocess.run(

@@ -3,8 +3,9 @@
 import polars as pl
 import pytest
 
-from rtn_fetcher import Tbl, build_contract, write_table_to_parquet
+from rtn_fetcher import Tbl, build_contract
 from rtn_fetcher.constants import SHEET_CONFIGS
+from rtn_fetcher.dataframe import to_polars
 
 
 def _monthly_df() -> pl.DataFrame:
@@ -84,8 +85,8 @@ class TestBuildContractQuarterly:
             self.contract.validate(df)
 
 
-class TestWriteTableToParquetSchema:
-    def test_writes_valid_parquet(self, tmp_path):
+class TestTblToContract:
+    def test_cast_produces_valid_frame(self):
         data = Tbl(
             [
                 ["year", 2020, 2021],
@@ -93,15 +94,6 @@ class TestWriteTableToParquetSchema:
                 ["value", 100.0, 200.0],
             ]
         )
-        out = tmp_path / "rtn.parquet"
-        write_table_to_parquet(data, out, "2.1")
-        assert out.exists()
-
-        df = pl.read_parquet(out)
         contract = build_contract("2.1", SHEET_CONFIGS["2.1"])
+        df = contract.cast(to_polars(data))
         contract.validate(df)
-
-    def test_rejects_unknown_sheet(self, tmp_path):
-        data = Tbl([["year", 2020], ["account", "a"], ["value", 1.0]])
-        with pytest.raises(ValueError, match="Unknown sheet"):
-            write_table_to_parquet(data, tmp_path / "x.parquet", "9.9")

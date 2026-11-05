@@ -35,7 +35,6 @@ __all__ = [
     "read_sheet",
     "read_all_sheets",
     "write_table_to_csv",
-    "write_table_to_parquet",
     # Data extraction
     "extract_publication_metadata",
     "extract_sheet_rows",
@@ -48,20 +47,17 @@ __all__ = [
 try:
     from .dataframe import to_polars
     from .schema import build_contract
-    from .writer import write_table_to_parquet
 
     _HAS_ANALYSIS = True
 except ImportError:
     _HAS_ANALYSIS = False
     to_polars = None
     build_contract = None
-    write_table_to_parquet = None
 
 if _HAS_ANALYSIS:
     __all__.extend(
         [
             "to_polars",
             "build_contract",
-            "write_table_to_parquet",
         ]
     )
