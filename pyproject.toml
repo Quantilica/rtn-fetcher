@@ -63,6 +63,8 @@ dev = [
     # host (sync --dry-run). Nunca em [project].dependencies — o plugin
     # consome o que o host já traz.
     "quantilica-cli>=0.15.0",
+    "typer>=0.15.0",
+    "rich>=13.0.0",
 ]
 
 [tool.pytest.ini_options]

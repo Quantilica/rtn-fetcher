@@ -7,6 +7,9 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Não lançado]
 
+### Alterado
+- Grupo `dev` passa a incluir `typer` e `rich`, como nos demais fetchers (os testes exercitam o plugin Typer do host).
+
 ### Removido
 - Módulo `rtn_fetcher.writer` e a função `write_table_to_parquet`: a conversão para Parquet é feita pelo comando `convert` (lake particionado), que já substituía esse caminho. Os arquivos já gravados no lake não mudam de nome nem de formato.
 
