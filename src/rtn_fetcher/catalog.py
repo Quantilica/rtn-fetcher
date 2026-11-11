@@ -15,9 +15,16 @@ from collections.abc import Callable, Iterable
 from typing import Any
 
 from bs4 import BeautifulSoup
+from quantilica.core.logging import get_logger
 
+from .constants import (
+    KNOWN_SERIE_HISTORICA_ANEXOS,
+    RTN_THOT_ARQUIVOS_BASE_URL,
+)
 from .extract import extract_publication_metadata
 from .fetcher import fetch_publications_metadata
+
+logger = get_logger(__name__)
 
 GROUP_SERIE_HISTORICA = "rtn"
 GROUP_ANEXOS = "rtn-anexos"
@@ -110,15 +117,49 @@ def resolve_groups_with_default(
     return resolve_default
 
 
+def _fallback_entries() -> list[dict[str, Any]]:
+    """Gera entradas sintéticas para a série histórica a partir dos anexos conhecidos.
+
+    Utilizado quando a API APEX do Tesouro Nacional está fora do ar (ex.: erro 503),
+    assegurando que comandos como ``sync`` e ``check`` não abortem com crash e consigam
+    baixar as versões mais recentes.
+    """
+    entries = []
+    for (ano, mes), meta in sorted(KNOWN_SERIE_HISTORICA_ANEXOS.items(), reverse=True):
+        filename = meta["filename"]
+        anexo_id = meta["anexo_id"]
+        url = f"{RTN_THOT_ARQUIVOS_BASE_URL}/publicacao-anexo/{anexo_id}"
+        entries.append(
+            {
+                "group": classify_entry(filename),
+                "id": filename,
+                "url": url,
+                "ano_publicacao": ano,
+                "mes_publicacao": mes,
+                "filename": filename,
+                "ext": file_extension(filename) or "xlsx",
+            }
+        )
+    return entries
+
+
 def _all_entries() -> list[dict[str, Any]]:
     global _cache
     now = time.monotonic()
     if _cache is not None and now - _cache[0] < _CACHE_TTL_SECONDS:
         return _cache[1]
 
-    html = fetch_publications_metadata()
-    soup = BeautifulSoup(html, "html.parser")
-    pubs = extract_publication_metadata(soup)
+    try:
+        html = fetch_publications_metadata()
+        soup = BeautifulSoup(html, "html.parser")
+        pubs = extract_publication_metadata(soup)
+    except Exception as exc:
+        logger.warning(
+            "API de metadados APEX indisponível (%s). Usando catálogo resiliente.", exc
+        )
+        entries = _fallback_entries()
+        _cache = (now, entries)
+        return entries
 
     entries = []
     for pub in pubs:

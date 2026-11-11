@@ -4,11 +4,41 @@ This module contains all configuration values, URLs, and constants used
 throughout the rtn-fetcher package.
 """
 
+from __future__ import annotations
+
+from typing import Any
+
 # API Configuration
 RTN_API_BASE_URL = "https://apiapex.tesouro.gov.br/aria//v1/thot/custom/rtn"
 RTN_FILE_BASE_URL = (
     "http://sisweb.tesouro.gov.br/apex/cosis/thot/link/rtn/serie-historica"
 )
+RTN_THOT_ARQUIVOS_BASE_URL = "https://thot-arquivos.tesouro.gov.br"
+RTN_CDN_BASE_URL = "https://cdn.tesouro.gov.br"
+RTN_CKAN_PACKAGE_URL = (
+    "https://www.tesourotransparente.gov.br/ckan/api/3/action/package_show"
+    "?id=ab56485b-9c40-4efb-8563-9ce3e1973c4b"
+)
+
+# Semente de anexos conhecidos da Série Histórica no THOT
+# Chave: (ano, mes) -> meta do anexo
+KNOWN_SERIE_HISTORICA_ANEXOS: dict[tuple[int, int], dict[str, Any]] = {
+    (2026, 9): {
+        "pub_id": 56116,
+        "anexo_id": 29566,
+        "filename": "serie_historica_set26.xlsx",
+    },
+    (2026, 8): {
+        "pub_id": 55921,
+        "anexo_id": 29326,
+        "filename": "serie_historica_ago26.xlsx",
+    },
+    (2026, 7): {
+        "pub_id": 55499,
+        "anexo_id": 29032,
+        "filename": "serie_historica_jul26.xlsx",
+    },
+}
 
 # HTTP Settings
 HTTP_REQUEST_TIMEOUT = 60
