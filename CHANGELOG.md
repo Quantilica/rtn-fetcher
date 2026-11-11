@@ -9,6 +9,7 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ### Adicionado
 - O fetcher declara os fatos da fonte (`FetcherInfo`: id canônico, órgão, página e cadência) para o registro de fetchers da Quantilica.
+- `stn-rtn` declarado como apelido do id `rtn` (nome antigo da fonte no catálogo).
 
 ### Alterado
 - Requer `quantilica-core>=0.19.0` (e `quantilica-cli>=0.17.0` como host).

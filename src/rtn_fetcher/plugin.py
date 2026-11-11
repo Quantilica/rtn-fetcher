@@ -45,6 +45,7 @@ fetcher = FetcherApp(
     info=FetcherInfo(
         id="rtn",
         nome="Resultado do Tesouro Nacional (RTN)",
+        aliases=("stn-rtn",),
         orgao="Secretaria do Tesouro Nacional (STN/MF)",
         licenca="Open Data Commons Open Database License (ODbL)",
         homepage="https://www.tesourotransparente.gov.br/ckan/",
