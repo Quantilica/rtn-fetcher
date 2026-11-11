@@ -30,7 +30,7 @@ classifiers = [
 dependencies = [
     "beautifulsoup4>=4.14.3",
     "openpyxl>=3.1.5",
-    "quantilica-core>=0.16.0",
+    "quantilica-core>=0.19.0",
 ]
 
 [project.optional-dependencies]
@@ -62,7 +62,7 @@ dev = [
     # Só para os testes: tests/test_catalog.py exercita o plugin Typer do
     # host (sync --dry-run). Nunca em [project].dependencies — o plugin
     # consome o que o host já traz.
-    "quantilica-cli>=0.15.0",
+    "quantilica-cli>=0.17.0",
     "typer>=0.15.0",
     "rich>=13.0.0",
 ]

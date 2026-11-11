@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from quantilica.cli.sdk import FetcherApp
+from quantilica.core.registry import FetcherInfo
 from quantilica.core.sync import FreshnessPolicy
 
 from .catalog import (
@@ -40,6 +41,15 @@ fetcher = FetcherApp(
         "Resultado do Tesouro Nacional (RTN). Sem grupo, sync/check usam só "
         "'rtn' (planilhas da série histórica); peça 'rtn-anexos', "
         "'rtn-publicacoes', 'planilhas' ou 'todos' para incluir o resto."
+    ),
+    info=FetcherInfo(
+        id="rtn",
+        nome="Resultado do Tesouro Nacional (RTN)",
+        orgao="Secretaria do Tesouro Nacional (STN/MF)",
+        licenca=None,
+        homepage="https://www.tesourotransparente.gov.br/ckan/",
+        cadencia="monthly",
+        dominio="fiscal",
     ),
     groups_dict=GROUPS,
     aliases_dict=GROUP_ALIASES,
