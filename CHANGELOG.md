@@ -13,6 +13,7 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 ### Alterado
 - Requer `quantilica-core>=0.19.0` (e `quantilica-cli>=0.17.0` como host).
 - Grupo `dev` passa a incluir `typer` e `rich`, como nos demais fetchers (os testes exercitam o plugin Typer do host).
+- `FetcherInfo.licenca` passa a declarar a licença da fonte: ODbL (evidência: https://www.tesourotransparente.gov.br/ckan/dataset/resultado-do-tesouro-nacional).
 
 ### Removido
 - Módulo `rtn_fetcher.writer` e a função `write_table_to_parquet`: a conversão para Parquet é feita pelo comando `convert` (lake particionado), que já substituía esse caminho. Os arquivos já gravados no lake não mudam de nome nem de formato.
