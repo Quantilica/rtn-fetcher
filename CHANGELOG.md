@@ -9,6 +9,7 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ### Adicionado
 - Testes: identidade do registro conferida.
+- Documentação dos dados em `docs/`, conforme a norma de documentação dos dados: página da fonte, página e esquema de referência para cada um dos 24 datasets, com o dicionário de todas as variáveis e a tabela de contas de cada aba. Um teste a verifica.
 
 ### Corrigido
 - CI: o pyproject declara o PyPI antes do índice Quantilica (`[[tool.uv.index]]`), e o workflow perde `--index` e `--index-strategy`. Com a estratégia padrão `first-index`, o `uv sync` só consulta o índice para o que não está no PyPI (`quantilica-analytics`) e deixa de receber o 503 intermitente que o GitHub Pages devolve a caminhos inexistentes.
