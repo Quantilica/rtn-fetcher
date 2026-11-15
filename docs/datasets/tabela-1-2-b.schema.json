@@ -1,0 +1,33 @@
+{
+  "fonte": "rtn",
+  "dataset": "tabela-1-2-b",
+  "gerado_em": "2026-11-15T17:34:38+00:00",
+  "particoes": [],
+  "colunas": [
+    {
+      "nome": "year",
+      "tipos": [
+        "int64"
+      ]
+    },
+    {
+      "nome": "month",
+      "tipos": [
+        "int64"
+      ]
+    },
+    {
+      "nome": "account",
+      "tipos": [
+        "large_string"
+      ]
+    },
+    {
+      "nome": "value",
+      "tipos": [
+        "double"
+      ]
+    }
+  ],
+  "arquivos": 1
+}
