@@ -7,6 +7,8 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Não lançado]
 
+
+## [0.7.1] - 2026-11-15
 ### Adicionado
 - Testes: identidade do registro conferida.
 - Documentação dos dados em `docs/`, conforme a norma de documentação dos dados: página da fonte, página e esquema de referência para cada um dos 24 datasets, com o dicionário de todas as variáveis e a tabela de contas de cada aba. Um teste a verifica. O `.gitignore` passa a aceitar os `*.schema.json` de `docs/datasets/`.
