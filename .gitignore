@@ -44,3 +44,4 @@ output/
 *.csv
 *.html
 *.json
+!docs/datasets/*.schema.json
