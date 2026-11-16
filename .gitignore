@@ -1,44 +1,58 @@
-# Build / packaging
 __pycache__/
 *.py[cod]
-*.egg-info/
+*$py.class
+*.so
+.Python
 build/
+develop-eggs/
 dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
-# Virtual envs e caches do uv
-.venv/
-.uv-cache/
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
 
-# Lockfile — libs não versionam uv.lock
-uv.lock
-
-# Caches de teste / lint / tipos
+# Testing and linters
 .pytest_cache/
+.coverage
+htmlcov/
 .ruff_cache/
 .mypy_cache/
 
-# Cobertura
-.coverage
-.coverage.*
-htmlcov/
-
-# Editor / IDE / OS
-.vscode/
+# IDEs
 .idea/
-.DS_Store
-Thumbs.db
+.vscode/
 *.swp
+*.swo
 
-# Logs e env locais
-*.log
-.env
-.env.local
-
-# Claude
-.claude/
+# Project specific
+uv.lock
+.backfill/
+data/
+lake/
 
 # Específico do repo
-data/
+.uv-cache/
+.coverage.*
+.DS_Store
+Thumbs.db
+*.log
+.env.local
+.claude/
 output/
 *.xlsx
 *.csv

@@ -1,0 +1,17 @@
+_commit: cacf1f7
+_src_path: /home/dk/code/Quantilica/fetcher-template
+author_email: daniel@dkko.me
+author_name: Komesu, D.K.
+cadencia: monthly
+description: RTN data fetching and export utilities
+domain: tesouro
+dominio: fiscal
+has_lake: true
+homepage: https://www.tesourotransparente.gov.br/ckan/
+licenca: Open Data Commons Open Database License (ODbL)
+orgao: Secretaria do Tesouro Nacional (STN/MF)
+package_name: rtn-fetcher
+package_slug: rtn_fetcher
+protocol: ckan
+source_id: rtn
+source_name: Resultado do Tesouro Nacional (RTN)
