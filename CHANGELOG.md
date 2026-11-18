@@ -7,6 +7,9 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Não lançado]
 
+### Corrigido
+- `lake`: o build sem mudança não abre mais a planilha. Com `datasets` alvo, as abas são conhecidas sem abri-la: se todas já estão no lake com o mesmo bruto (sidecar e rodapé do Parquet), conta `skipped` sem abrir o XLSX; sem alvo, ou com abas ainda por converter, a planilha é aberta mas cada aba em dia é pulada antes de ser lida e convertida. Mesma contagem de `converted`/`skipped`/`errors`; `force` e bruto novo seguem convertendo.
+
 ### Alterado
 - Infraestrutura de CI e de repositório alinhada ao template de fetchers da Quantilica (`fetcher-template`): workflows `public-hygiene` e `publish`, `dependabot.yml`, `.gitignore` e `pytest` com `pythonpath = ["src"]`. O `.copier-answers.yml` passa a registrar as respostas do template, para receber as melhorias dele por `copier update`.
 

@@ -140,6 +140,52 @@ def workbook_sheets(workbook: Workbook) -> list[str]:
     return [sheet for sheet in SHEET_CONFIGS if sheet in workbook.sheetnames]
 
 
+def _sheet_key(sheet_name: str) -> str:
+    """Chave de arquivo da aba no lake (``1.1`` -> ``1-1``)."""
+    return sheet_name.replace(".", "-")
+
+
+def _sheet_writer(lake_dir: Path, sheet_name: str, *, force: bool) -> LakeWriter:
+    """``LakeWriter`` do dataset de uma aba (sem partições)."""
+    dataset_id = sheet_to_dataset_id(sheet_name)
+    return LakeWriter(
+        lake_dir / SOURCE_ID / dataset_id,
+        DatasetDescriptor(
+            source_id=SOURCE_ID,
+            dataset_id=dataset_id,
+            alias=sheet_name,
+            partition_keys=[],
+            partition_types=partition_types_for([]),
+        ),
+        force=force,
+    )
+
+
+def _all_sheets_current(
+    lake_dir: Path, path: Path, sheets: set[str], *, force: bool
+) -> bool:
+    """Se toda aba alvo já está no lake com o sha256 desta planilha.
+
+    Decide pular a planilha sem abri-la (``openpyxl`` lê o ZIP inteiro, e o
+    bruto pode estar numa montagem de rede lenta): só usa o sidecar do bruto e
+    os rodapés dos Parquets. Uma aba que está em dia existia na planilha, então
+    a contagem de ``skipped`` é a mesma de abrir e conferir aba por aba. Em caso
+    de erro na checagem, devolve ``False`` e a conversão segue o caminho normal,
+    que reporta o erro.
+    """
+    if force or not sheets:
+        return False
+    try:
+        return all(
+            _sheet_writer(lake_dir, sheet, force=False).is_current(
+                path, file_key_name=_sheet_key(sheet)
+            )
+            for sheet in sheets
+        )
+    except Exception:  # noqa: BLE001 - na dúvida, abre a planilha como antes
+        return False
+
+
 class LakeConverter:
     """Converter registered under the ``quantilica.lake`` entry point."""
 
@@ -192,6 +238,14 @@ class LakeConverter:
             return result
 
         for path in workbooks:
+            # Com datasets alvo, as abas são conhecidas sem abrir a planilha: se
+            # todas estão em dia no lake, pula sem abri-la.
+            if allowed_sheets is not None and _all_sheets_current(
+                lake_dir, path, allowed_sheets, force=force
+            ):
+                result.skipped += len(allowed_sheets)
+                continue
+
             try:
                 wb = open_workbook(path)
             except Exception as exc:
@@ -205,20 +259,13 @@ class LakeConverter:
             ]
 
             for sheet_name in sheets_to_process:
-                dataset_id = sheet_to_dataset_id(sheet_name)
-                writer = LakeWriter(
-                    lake_dir / SOURCE_ID / dataset_id,
-                    DatasetDescriptor(
-                        source_id=SOURCE_ID,
-                        dataset_id=dataset_id,
-                        alias=sheet_name,
-                        partition_keys=[],
-                        partition_types=partition_types_for([]),
-                    ),
-                    force=force,
-                )
+                writer = _sheet_writer(lake_dir, sheet_name, force=force)
 
                 try:
+                    # Aba em dia: pula antes de ler e converter a planilha.
+                    if writer.is_current(path, file_key_name=_sheet_key(sheet_name)):
+                        result.skipped += 1
+                        continue
                     data, _ = read_workbook_sheet(wb, sheet_name)
                     df = to_polars(data)
                     contract = build_contract(sheet_name, SHEET_CONFIGS[sheet_name])
@@ -227,7 +274,7 @@ class LakeConverter:
                     written = writer.write_polars(
                         df,
                         path,
-                        file_key_name=sheet_name.replace(".", "-"),
+                        file_key_name=_sheet_key(sheet_name),
                         converter=f"rtn-fetcher {__version__}",
                     )
                     if written.status == "skipped":
