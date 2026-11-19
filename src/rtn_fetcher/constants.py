@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Any
 
 # API Configuration
-RTN_API_BASE_URL = "https://apiapex.tesouro.gov.br/aria//v1/thot/custom/rtn"
+RTN_API_BASE_URL = "https://apiapex.tesouro.gov.br/aria/v1/thot/custom/rtn"
 RTN_FILE_BASE_URL = (
     "http://sisweb.tesouro.gov.br/apex/cosis/thot/link/rtn/serie-historica"
 )
