@@ -5,13 +5,15 @@ Todas as mudanças notáveis deste projeto serão documentadas neste arquivo.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/),
 e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
-## [Não lançado]
-
-### Corrigido
-- `lake`: o build sem mudança não abre mais a planilha. Com `datasets` alvo, as abas são conhecidas sem abri-la: se todas já estão no lake com o mesmo bruto (sidecar e rodapé do Parquet), conta `skipped` sem abrir o XLSX; sem alvo, ou com abas ainda por converter, a planilha é aberta mas cada aba em dia é pulada antes de ser lida e convertida. Mesma contagem de `converted`/`skipped`/`errors`; `force` e bruto novo seguem convertendo. Exige `quantilica-analytics>=0.14.0` (o sha256 do bruto sai do sidecar, sem lê-lo). Os testes usam sidecar e espiam as leituras do bruto.
+## [0.7.2] - 2026-11-19
 
 ### Alterado
+
 - Infraestrutura de CI e de repositório alinhada ao template de fetchers da Quantilica (`fetcher-template`): workflows `public-hygiene` e `publish`, `dependabot.yml`, `.gitignore` e `pytest` com `pythonpath = ["src"]`. O `.copier-answers.yml` passa a registrar as respostas do template, para receber as melhorias dele por `copier update`.
+
+### Corrigido
+
+- `lake`: o build sem mudança não abre mais a planilha. Com `datasets` alvo, as abas são conhecidas sem abri-la: se todas já estão no lake com o mesmo bruto (sidecar e rodapé do Parquet), conta `skipped` sem abrir o XLSX; sem alvo, ou com abas ainda por converter, a planilha é aberta mas cada aba em dia é pulada antes de ser lida e convertida. Mesma contagem de `converted`/`skipped`/`errors`; `force` e bruto novo seguem convertendo. Exige `quantilica-analytics>=0.14.0` (o sha256 do bruto sai do sidecar, sem lê-lo). Os testes usam sidecar e espiam as leituras do bruto.
 
 ## [0.7.1] - 2026-11-15
 ### Adicionado
