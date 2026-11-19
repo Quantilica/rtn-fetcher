@@ -5,6 +5,12 @@ Todas as mudanças notáveis deste projeto serão documentadas neste arquivo.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/),
 e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [0.7.3] - 2026-11-19
+
+### Corrigido
+
+- A descoberta das edições pela API de metadados usava uma rota com barra dupla (`aria//v1`), que a origem passou a recusar com HTTP 403; o catálogo caía na lista fixa de anexos e não via edições novas. A rota agora é `aria/v1`.
+
 ## [0.7.2] - 2026-11-19
 
 ### Alterado
