@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime as dt
 from pathlib import Path
 from typing import Any, cast
+from urllib.parse import urlsplit
 
 from quantilica.cli.sdk import CheckPlanItem, FetcherApp
 from quantilica.core.http import HttpClient
@@ -18,7 +19,7 @@ from .catalog import (
     list_datasets,
     resolve_groups_with_default,
 )
-from .fetcher import resolve_pdf_url
+from .fetcher import VIEWER_HOST, resolve_pdf_url
 from .storage import DataRepository
 
 logger = get_logger(__name__)
@@ -54,6 +55,8 @@ class RtnFetcherApp(FetcherApp):
         ext = str(entry.get("ext") or "").lstrip(".").lower()
         if ext != "pdf":
             return entry
+        if urlsplit(str(entry["url"])).hostname != VIEWER_HOST:
+            return entry  # já é a URL do arquivo (plano do check)
         real_url = resolve_pdf_url(cast(HttpClient, self.client), str(entry["url"]))
         return {**entry, "url": real_url, "expected_format": "pdf"}
 

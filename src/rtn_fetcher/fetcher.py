@@ -50,6 +50,9 @@ def _get_client() -> HttpClient:
 # Domínio (e subdomínios) de onde o visualizador de PDF pode apontar o arquivo.
 PDF_HOST_DOMAIN = "tesouro.gov.br"
 PDF_SIGNATURE = b"%PDF"
+# Teto para a página visualizadora (a real tem ~400 bytes).
+MAX_VIEWER_BYTES = 1_000_000
+VIEWER_HOST = "thot-arquivos.tesouro.gov.br"
 
 SOURCE_ID = "tesouro-nacional"
 DATASET_ID = "rtn"
@@ -299,17 +302,26 @@ def resolve_pdf_url(client: HttpClient, url: str) -> str:
     Raises:
         FetchError: Se a resposta não for PDF nem um visualizador válido.
     """
-    response = client.get(url)
-    if is_pdf_body(response.content):
-        return url
-    content_type = response.headers.get("Content-Type", "")
-    if "html" not in content_type.lower() and not response.content.lstrip().startswith(
-        b"<"
-    ):
+    chunks: list[bytes] = []
+    size = 0
+    with client.stream("GET", url) as response:
+        content_type = response.headers.get("Content-Type", "")
+        for chunk in response.iter_bytes():
+            if not chunks and is_pdf_body(chunk):
+                return url  # já é o PDF: não lê o resto do corpo
+            chunks.append(chunk)
+            size += len(chunk)
+            if size > MAX_VIEWER_BYTES:
+                raise FetchError(
+                    f"Resposta de {url} grande demais para ser um visualizador"
+                )
+        encoding = response.encoding or "utf-8"
+    body = b"".join(chunks)
+    if "html" not in content_type.lower() and not body.lstrip().startswith(b"<"):
         raise FetchError(
             f"Resposta de {url} não é PDF nem HTML (Content-Type {content_type!r})"
         )
-    return extract_pdf_viewer_url(response.text)
+    return extract_pdf_viewer_url(body.decode(encoding, errors="replace"))
 
 
 def _check_pdf_before_write(dest_file: Path, content: bytes) -> None:

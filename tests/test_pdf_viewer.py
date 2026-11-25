@@ -189,3 +189,11 @@ def test_check_entry_uses_real_pdf(tmp_path: Path):
     assert item.url == CDN_URL
     assert item.action == "download"
     assert item.entry["expected_format"] == "pdf"
+
+
+def test_entry_already_pointing_to_cdn_is_not_resolved_again():
+    calls: list[str] = []
+    app = _app(_make_handler({}, calls))
+    entry = _entry(url=CDN_URL)
+    assert app._resolve_pdf_entry(entry) is entry
+    assert calls == []
