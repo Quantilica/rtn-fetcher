@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import datetime as dt
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
-from quantilica.cli.sdk import FetcherApp
+from quantilica.cli.sdk import CheckPlanItem, FetcherApp
+from quantilica.core.http import HttpClient
+from quantilica.core.logging import get_logger
 from quantilica.core.registry import FetcherInfo
 from quantilica.core.sync import FreshnessPolicy
 
@@ -16,7 +18,10 @@ from .catalog import (
     list_datasets,
     resolve_groups_with_default,
 )
+from .fetcher import resolve_pdf_url
 from .storage import DataRepository
+
+logger = get_logger(__name__)
 
 
 def path_builder(
@@ -35,7 +40,52 @@ def path_builder(
     return DataRepository(output_dir).path_for_entry(entry, last_modified=last_modified)
 
 
-fetcher = FetcherApp(
+class RtnFetcherApp(FetcherApp):
+    """``FetcherApp`` que baixa o PDF real no lugar da página visualizadora.
+
+    O endereço de cada anexo PDF do Tesouro devolve uma página HTML
+    ("Visualização de PDF") com o arquivo num iframe. Antes de baixar ou
+    checar um PDF, a entrada passa a apontar para a URL real (validada) e a
+    exigir assinatura ``%PDF``; o nome do arquivo no bruto não muda.
+    """
+
+    def _resolve_pdf_entry(self, entry: dict[str, Any]) -> dict[str, Any]:
+        """Devolve a entrada com a URL do PDF real; outras entradas passam."""
+        ext = str(entry.get("ext") or "").lstrip(".").lower()
+        if ext != "pdf":
+            return entry
+        real_url = resolve_pdf_url(cast(HttpClient, self.client), str(entry["url"]))
+        return {**entry, "url": real_url, "expected_format": "pdf"}
+
+    def download_entry(
+        self,
+        entry: dict[str, Any],
+        output_dir: Path,
+        *,
+        dry_run: bool = False,
+        **kwargs: Any,
+    ) -> Path:
+        """Baixa a entrada; para PDF, resolve o visualizador antes."""
+        if not dry_run:
+            entry = self._resolve_pdf_entry(entry)
+        return super().download_entry(entry, output_dir, dry_run=dry_run, **kwargs)
+
+    def check_entry(self, entry: dict[str, Any], output_dir: Path) -> CheckPlanItem:
+        """Confere a entrada; para PDF, confere o arquivo real.
+
+        Se o visualizador não puder ser resolvido, cai na checagem padrão da
+        página (o download recusará o corpo inválido).
+        """
+        try:
+            entry = self._resolve_pdf_entry(entry)
+        except Exception as exc:  # noqa: BLE001 - checagem é best effort
+            logger.warning(
+                "PDF %s: visualizador não resolvido: %s", entry.get("id"), exc
+            )
+        return super().check_entry(entry, output_dir)
+
+
+fetcher = RtnFetcherApp(
     name="rtn-fetcher",
     help=(
         "Resultado do Tesouro Nacional (RTN). Sem grupo, sync/check usam só "

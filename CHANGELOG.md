@@ -5,6 +5,12 @@ Todas as mudanças notáveis deste projeto serão documentadas neste arquivo.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/),
 e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [Não lançado]
+
+### Corrigido
+
+- Anexos PDF: o endereço de publicação/anexo do Tesouro devolve uma página HTML "Visualização de PDF" com o arquivo num iframe, e era essa página (cerca de 400 bytes) que ficava salva no lugar do PDF. `sync` e `check` agora leem o `src` do iframe, aceitam só `https` em `tesouro.gov.br` ou subdomínio (sem credenciais nem porta atípica) e baixam o PDF real, com carimbo da versão vindo do `Last-Modified` dele. O nome do arquivo não muda. Corpo que não começa com `%PDF` é recusado antes de substituir qualquer arquivo existente; página sem iframe ou com iframe para outro host é recusada.
+
 ## [0.7.3] - 2026-11-19
 
 ### Corrigido
