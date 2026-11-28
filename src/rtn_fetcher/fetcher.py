@@ -5,7 +5,7 @@ Tesouro Nacional API.
 """
 
 import datetime as dt
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
@@ -133,29 +133,53 @@ def _resolve_via_catalog(client: HttpClient) -> _Resolution:
     """Resolve pelo catálogo, o mesmo que o ``sync`` usa para o grupo ``rtn``.
 
     Escolhe a planilha mais recente da série histórica listada pelo catálogo
-    (que já cai na lista de anexos conhecidos se a API de metadados estiver
-    fora do ar).
+    real. A lista fixa de anexos (usada quando a API de metadados está fora do
+    ar) é recusada: pode estar atrasada. Se o mesmo (ano, mês) tiver mais de uma
+    planilha, vence a de ``Last-Modified`` mais recente.
     """
-    from .catalog import latest_serie_historica_entry
+    from .catalog import latest_serie_historica_entries
 
-    entry = latest_serie_historica_entry()
-    url = str(entry["url"])
-    head = client.head_or_get(url)
-    _check_not_html(head, url)
-    modified_date = _last_modified_of(head, url)
+    best: tuple[_Resolution, dict[str, Any]] | None = None
+    for entry in latest_serie_historica_entries():
+        url = str(entry["url"])
+        head = client.head_or_get(url)
+        _check_not_html(head, url)
+        resolution: _Resolution = (url, _last_modified_of(head, url), None)
+        if best is None or resolution[1] > best[0][1]:
+            best = (resolution, entry)
+    assert best is not None  # a função acima nunca devolve lista vazia
+    resolution, entry = best
     logger.info(
         "Série histórica do RTN escolhida pelo catálogo: %s (%02d/%d)",
         entry["filename"],
         int(entry["mes_publicacao"]),
         int(entry["ano_publicacao"]),
     )
-    return url, modified_date, None
+    return resolution
+
+
+def _ckan_resource_date(resource: dict[str, Any]) -> dt.datetime | None:
+    """Data de modificação de um recurso do CKAN, quando informada."""
+    for key in ("last_modified", "metadata_modified", "created"):
+        value = resource.get(key)
+        if value:
+            try:
+                return dt.datetime.fromisoformat(str(value))
+            except ValueError:
+                continue
+    return None
 
 
 def _resolve_via_ckan(client: HttpClient) -> _Resolution:
-    """Resolve pelo recurso da série histórica no CKAN (último recurso)."""
+    """Resolve pelos recursos da série histórica no CKAN (último recurso).
+
+    Considera todos os recursos XLSX da série, do mais recente (data de
+    modificação do recurso) ao mais antigo, e fica com o primeiro que responder.
+    Sem data nos recursos, a escolha segue a ordem da fonte (registrado no log).
+    """
     data = client.get_json(RTN_CKAN_PACKAGE_URL)
     resources = data.get("result", {}).get("resources", [])
+    matching: list[dict[str, Any]] = []
     for r in resources:
         r_name = r.get("name", "").lower()
         r_url = r.get("url", "").lower()
@@ -164,22 +188,41 @@ def _resolve_via_ckan(client: HttpClient) -> _Resolution:
             k in r_name or k in r_url
             for k in ["serie", "série", "historica", "histórica"]
         )
-        if not (is_xlsx and is_serie):
-            continue
-        ckan_url = r.get("url")
-        if not ckan_url:
-            continue
-        head = client.head_or_get(ckan_url)
-        _check_not_html(head, ckan_url)
-        if head.headers.get("Last-Modified"):
-            return ckan_url, _last_modified_of(head, ckan_url), None
-        ckan_lm = r.get("last_modified")
-        if ckan_lm:
-            return ckan_url, dt.datetime.fromisoformat(ckan_lm), None
-    raise FetchError("o pacote do CKAN não lista a série histórica em XLSX")
+        if is_xlsx and is_serie and r.get("url"):
+            matching.append(r)
+    if not matching:
+        raise FetchError("o pacote do CKAN não lista a série histórica em XLSX")
+
+    dated = [r for r in matching if _ckan_resource_date(r) is not None]
+    if dated:
+        dated.sort(key=lambda r: _ckan_resource_date(r), reverse=True)  # type: ignore[arg-type,return-value]
+        ordered = dated + [r for r in matching if r not in dated]
+    else:
+        logger.info(
+            "CKAN: recursos sem data de modificação; escolha pela ordem da fonte"
+        )
+        ordered = matching
+
+    errors: list[str] = []
+    for r in ordered:
+        ckan_url = str(r["url"])
+        try:
+            head = client.head_or_get(ckan_url)
+            _check_not_html(head, ckan_url)
+            if head.headers.get("Last-Modified"):
+                return ckan_url, _last_modified_of(head, ckan_url), None
+            ckan_date = _ckan_resource_date(r)
+            if ckan_date is not None:
+                return ckan_url, ckan_date, None
+            raise FetchError(f"{ckan_url} sem Last-Modified nem data no CKAN")
+        except Exception as exc:  # noqa: BLE001 - tenta o próximo recurso
+            logger.warning("CKAN: recurso %s falhou: %s", ckan_url, _describe(exc))
+            errors.append(f"{ckan_url}: {_describe(exc)}")
+    raise FetchError("nenhum recurso do CKAN respondeu (" + "; ".join(errors) + ")")
 
 
-# Caminhos para achar a planilha, na ordem em que são tentados.
+# Caminhos para achar a planilha: link curto e catálogo são comparados; o CKAN
+# é o último recurso.
 _PATHS: tuple[tuple[str, Callable[[HttpClient], _Resolution]], ...] = (
     ("link curto da fonte", _resolve_via_link),
     ("catálogo", _resolve_via_catalog),
@@ -199,13 +242,52 @@ def _fail_all(causes: list[tuple[str, BaseException]]) -> FetchError:
     )
 
 
+def _candidates(
+    client: HttpClient, causes: list[tuple[str, BaseException]]
+) -> Iterator[tuple[str, _Resolution]]:
+    """Gera, do melhor ao pior, os caminhos que resolveram (lazy no CKAN).
+
+    O link curto e o catálogo são resolvidos antes de qualquer download para que
+    o link, mesmo funcionando, não vença uma edição mais nova do catálogo: vence
+    o de ``Last-Modified`` mais recente (empate: o link). Se um deles falha, o
+    outro vale. O CKAN só é consultado se os dois não bastarem. Causas de falha
+    de resolução vão para ``causes``.
+    """
+    resolved: list[tuple[str, _Resolution]] = []
+    for label, resolve in _PATHS[:2]:
+        try:
+            resolved.append((label, resolve(client)))
+        except Exception as exc:  # noqa: BLE001 - cai para o próximo caminho
+            logger.warning("Caminho '%s' indisponível: %s", label, _describe(exc))
+            causes.append((label, exc))
+    # ordenação estável: em empate, fica o link (primeiro da lista)
+    resolved.sort(key=lambda item: item[1][1], reverse=True)
+    if len(resolved) == 2 and resolved[0][0] != _PATHS[0][0]:
+        logger.warning(
+            "Link curto abandonado: o catálogo tem edição mais nova "
+            "(Last-Modified %s contra %s do link)",
+            resolved[0][1][1],
+            resolved[1][1][1],
+        )
+    yield from resolved
+    label, resolve = _PATHS[2]
+    try:
+        resolution = resolve(client)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Caminho '%s' indisponível: %s", label, _describe(exc))
+        causes.append((label, exc))
+        return
+    yield label, resolution
+
+
 def resolve_latest_serie_historica(
     client: HttpClient,
 ) -> tuple[str, dt.datetime, dict[str, str] | None]:
     """Resolve a URL, o ``Last-Modified`` e os params da série histórica mais recente.
 
-    Tenta, nesta ordem: o link curto da fonte, o catálogo (o mesmo do
-    ``sync``) e o CKAN. Um link que responde erro, página HTML ou sem
+    Consulta o link curto da fonte e o catálogo (o mesmo do ``sync``) e fica com
+    o de modificação mais recente (empate: o link); se um falhar, vale o outro.
+    O CKAN é o último recurso. Link que responde erro, página HTML ou sem
     ``Last-Modified`` é abandonado.
 
     Returns:
@@ -215,13 +297,7 @@ def resolve_latest_serie_historica(
         FetchError: Se nenhum caminho resolver (a mensagem traz cada causa).
     """
     causes: list[tuple[str, BaseException]] = []
-    for label, resolve in _PATHS:
-        try:
-            resolution = resolve(client)
-        except Exception as exc:  # noqa: BLE001 - cai para o próximo caminho
-            logger.warning("Caminho '%s' indisponível: %s", label, _describe(exc))
-            causes.append((label, exc))
-            continue
+    for label, resolution in _candidates(client, causes):
         logger.info("Série histórica do RTN resolvida pelo caminho '%s'", label)
         return resolution
     raise _fail_all(causes) from (causes[-1][1] if causes else None)
@@ -230,10 +306,12 @@ def resolve_latest_serie_historica(
 def download_latest_file(destination_dir: Path) -> Path:
     """Download the latest RTN historical series Excel file.
 
-    Tenta primeiro o link curto da fonte; se ele falhar (erro HTTP, tempo
-    esgotado, página HTML ou arquivo que não é planilha), usa o catálogo (o
-    mesmo do ``sync``) e escolhe a série histórica mais recente. O CKAN é o
-    último recurso.
+    Resolve o link curto da fonte e o catálogo (o mesmo do ``sync``, que só
+    vale com o catálogo real, nunca a lista fixa) e baixa a edição de
+    modificação mais recente; o link vence o empate e vale sozinho se o
+    catálogo estiver fora. Se o download do escolhido falhar (erro HTTP, tempo
+    esgotado, página HTML ou arquivo que não é um ZIP válido, contêiner do
+    XLSX), tenta o outro; o CKAN é o último recurso.
 
     The filename embeds the remote ``Last-Modified`` timestamp, so each new
     upstream version produces a distinct local file. Returns the local path;
@@ -252,12 +330,10 @@ def download_latest_file(destination_dir: Path) -> Path:
     causes: list[tuple[str, BaseException]] = []
 
     with log_step(logger, "download-rtn-file"):
-        for label, resolve in _PATHS:
+        for label, (url, modified_date, params) in _candidates(client, causes):
+            filename = generate_filename(modified_date)
+            destination_path = Path(destination_dir) / filename
             try:
-                url, modified_date, params = resolve(client)
-                filename = generate_filename(modified_date)
-                destination_path = Path(destination_dir) / filename
-
                 if is_complete_file(destination_path):
                     logger.info(f"File {filename} already exists, skipping download.")
                     return destination_path
@@ -273,7 +349,7 @@ def download_latest_file(destination_dir: Path) -> Path:
                 )
             except Exception as exc:  # noqa: BLE001 - cai para o próximo caminho
                 logger.warning(
-                    "Caminho '%s' falhou, tentando o próximo: %s",
+                    "Caminho '%s' falhou no download, tentando o próximo: %s",
                     label,
                     _describe(exc),
                 )
@@ -282,7 +358,7 @@ def download_latest_file(destination_dir: Path) -> Path:
             if causes:
                 logger.info(
                     "Série histórica do RTN baixada pelo caminho '%s' "
-                    "(abandonado antes: %s)",
+                    "(abandonados antes: %s)",
                     label,
                     "; ".join(f"{lb}: {_describe(e)}" for lb, e in causes),
                 )

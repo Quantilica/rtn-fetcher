@@ -139,6 +139,10 @@ def _fallback_entries() -> list[dict[str, Any]]:
                 "mes_publicacao": mes,
                 "filename": filename,
                 "ext": file_extension(filename) or "xlsx",
+                # Lista fixa, não o catálogo real: pode estar atrasada em relação
+                # à fonte. ``sync``/``check`` a usam como sempre; quem precisa da
+                # edição mais recente (``download_latest_file``) a recusa.
+                "synthetic": True,
             }
         )
     return entries
@@ -210,24 +214,46 @@ def list_datasets(group: str | None = None) -> list[dict[str, Any]]:
     return [e for e in entries if e["group"] == group]
 
 
-def latest_serie_historica_entry() -> dict[str, Any]:
-    """Entrada mais recente da série histórica (grupo ``rtn``) em planilha XLSX.
+def latest_serie_historica_entries() -> list[dict[str, Any]]:
+    """Entradas da edição mais recente da série histórica (grupo ``rtn``, XLSX).
 
-    A mais recente é a de maior (ano, mês) de publicação. É a planilha que
-    ``read_all_sheets`` sabe ler; entradas de outro formato são ignoradas.
+    A edição mais recente é a de maior (ano, mês) de publicação; o mês vai de 1
+    a 12 (entradas fora disso são ignoradas). Em geral há uma entrada só, mas o
+    mesmo (ano, mês) pode ter mais de uma planilha (ex.: jan/2021 tem a original
+    e a "nova estrutura"); nesse caso todas as empatadas são devolvidas, para
+    quem chama desempatar pela data de modificação na fonte.
+
+    Entradas sintéticas (a lista fixa usada quando a API de metadados está fora
+    do ar) são recusadas: ela pode estar atrasada e passaria uma edição velha
+    por atual.
 
     Raises:
-        FetchError: Se o catálogo não listar nenhuma planilha XLSX da série.
+        FetchError: Se o catálogo só tiver a lista fixa ou não listar nenhuma
+            planilha XLSX da série.
     """
     candidates: list[tuple[tuple[int, int], dict[str, Any]]] = []
+    synthetic = 0
     for entry in list_datasets(GROUP_SERIE_HISTORICA):
         if entry.get("ext") != "xlsx":
             continue
+        if entry.get("synthetic"):
+            synthetic += 1
+            continue
         try:
-            key = (int(entry["ano_publicacao"]), int(entry["mes_publicacao"]))
+            ano = int(entry["ano_publicacao"])
+            mes = int(entry["mes_publicacao"])
         except (KeyError, TypeError, ValueError):
             continue
-        candidates.append((key, entry))
+        if not 1 <= mes <= 12:
+            continue
+        candidates.append(((ano, mes), entry))
     if not candidates:
+        if synthetic:
+            raise FetchError(
+                "o catálogo real está indisponível (API de metadados fora do ar); "
+                "só a lista fixa de anexos conhecidos, possivelmente desatualizada, "
+                "foi recusada"
+            )
         raise FetchError("o catálogo não lista nenhuma série histórica em XLSX")
-    return max(candidates, key=lambda item: item[0])[1]
+    newest = max(key for key, _ in candidates)
+    return [entry for key, entry in candidates if key == newest]
