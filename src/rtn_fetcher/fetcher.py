@@ -140,14 +140,27 @@ def _resolve_via_catalog(client: HttpClient) -> _Resolution:
     from .catalog import latest_serie_historica_entries
 
     best: tuple[_Resolution, dict[str, Any]] | None = None
+    errors: list[str] = []
     for entry in latest_serie_historica_entries():
         url = str(entry["url"])
-        head = client.head_or_get(url)
-        _check_not_html(head, url)
-        resolution: _Resolution = (url, _last_modified_of(head, url), None)
+        try:
+            head = client.head_or_get(url)
+            _check_not_html(head, url)
+            resolution: _Resolution = (url, _last_modified_of(head, url), None)
+        except Exception as exc:  # noqa: BLE001 - pula só esta planilha
+            logger.warning(
+                "Catálogo: planilha %s ignorada: %s", entry["filename"], _describe(exc)
+            )
+            errors.append(f"{entry['filename']}: {_describe(exc)}")
+            continue
         if best is None or resolution[1] > best[0][1]:
             best = (resolution, entry)
-    assert best is not None  # a função acima nunca devolve lista vazia
+    if best is None:
+        raise FetchError(
+            "nenhuma planilha da edição mais recente do catálogo respondeu ("
+            + "; ".join(errors)
+            + ")"
+        )
     resolution, entry = best
     logger.info(
         "Série histórica do RTN escolhida pelo catálogo: %s (%02d/%d)",
@@ -158,15 +171,32 @@ def _resolve_via_catalog(client: HttpClient) -> _Resolution:
     return resolution
 
 
+def _to_utc_naive(value: dt.datetime) -> dt.datetime:
+    """UTC sem fuso: data com offset é convertida, data sem fuso vale como UTC."""
+    if value.tzinfo is not None:
+        value = value.astimezone(dt.UTC).replace(tzinfo=None)
+    return value
+
+
+def _parse_ckan_date(value: Any) -> dt.datetime | None:
+    if not value:
+        return None
+    try:
+        return _to_utc_naive(dt.datetime.fromisoformat(str(value)))
+    except ValueError:
+        return None
+
+
 def _ckan_resource_date(resource: dict[str, Any]) -> dt.datetime | None:
-    """Data de modificação de um recurso do CKAN, quando informada."""
+    """Data para ORDENAR os recursos do CKAN (UTC sem fuso), quando informada.
+
+    Serve só para ordenar: ``metadata_modified`` e ``created`` não são a data do
+    arquivo e nunca viram o carimbo dele.
+    """
     for key in ("last_modified", "metadata_modified", "created"):
-        value = resource.get(key)
-        if value:
-            try:
-                return dt.datetime.fromisoformat(str(value))
-            except ValueError:
-                continue
+        parsed = _parse_ckan_date(resource.get(key))
+        if parsed is not None:
+            return parsed
     return None
 
 
@@ -174,8 +204,11 @@ def _resolve_via_ckan(client: HttpClient) -> _Resolution:
     """Resolve pelos recursos da série histórica no CKAN (último recurso).
 
     Considera todos os recursos XLSX da série, do mais recente (data de
-    modificação do recurso) ao mais antigo, e fica com o primeiro que responder.
-    Sem data nos recursos, a escolha segue a ordem da fonte (registrado no log).
+    modificação do recurso, normalizada para UTC) ao mais antigo, e fica com o
+    primeiro que responder. Sem data nos recursos, a escolha segue a ordem da
+    fonte (registrado no log). O carimbo do arquivo é o ``Last-Modified`` HTTP do
+    recurso ou, sem ele, o ``last_modified`` do recurso; sem nenhum dos dois o
+    recurso não serve.
     """
     data = client.get_json(RTN_CKAN_PACKAGE_URL)
     resources = data.get("result", {}).get("resources", [])
@@ -195,8 +228,11 @@ def _resolve_via_ckan(client: HttpClient) -> _Resolution:
 
     dated = [r for r in matching if _ckan_resource_date(r) is not None]
     if dated:
-        dated.sort(key=lambda r: _ckan_resource_date(r), reverse=True)  # type: ignore[arg-type,return-value]
-        ordered = dated + [r for r in matching if r not in dated]
+        dated.sort(
+            key=lambda r: _ckan_resource_date(r) or dt.datetime.min, reverse=True
+        )
+        undated = [r for r in matching if _ckan_resource_date(r) is None]
+        ordered = dated + undated
     else:
         logger.info(
             "CKAN: recursos sem data de modificação; escolha pela ordem da fonte"
@@ -209,12 +245,18 @@ def _resolve_via_ckan(client: HttpClient) -> _Resolution:
         try:
             head = client.head_or_get(ckan_url)
             _check_not_html(head, ckan_url)
+            # carimbo do arquivo: o Last-Modified HTTP do próprio recurso; sem
+            # ele, o last_modified do recurso. metadata_modified/created não
+            # servem (podem ser posteriores ao arquivo).
             if head.headers.get("Last-Modified"):
                 return ckan_url, _last_modified_of(head, ckan_url), None
-            ckan_date = _ckan_resource_date(r)
+            ckan_date = _parse_ckan_date(r.get("last_modified"))
             if ckan_date is not None:
                 return ckan_url, ckan_date, None
-            raise FetchError(f"{ckan_url} sem Last-Modified nem data no CKAN")
+            raise FetchError(
+                f"{ckan_url} sem Last-Modified nem last_modified no CKAN "
+                "(sem data confiável do arquivo)"
+            )
         except Exception as exc:  # noqa: BLE001 - tenta o próximo recurso
             logger.warning("CKAN: recurso %s falhou: %s", ckan_url, _describe(exc))
             errors.append(f"{ckan_url}: {_describe(exc)}")

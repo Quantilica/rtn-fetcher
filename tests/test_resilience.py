@@ -316,10 +316,11 @@ def test_empate_de_periodo_vence_a_modificada_mais_recente(
 ):
     original = _entry(2026, 10, 100, nome="serie_historica_out26.xlsx")
     revisada = _entry(2026, 10, 101, nome="serie_historica_out26_revisada.xlsx")
+    setembro = _entry(2026, 9, 99)
     monkeypatch.setattr(
         catalog,
         "list_datasets",
-        lambda group=None: [original, _entry(2026, 9, 99), revisada],
+        lambda group=None: [original, setembro, revisada],
     )
     url_o, url_r = original["url"], revisada["url"]
     client = FakeClient(
@@ -331,7 +332,47 @@ def test_empate_de_periodo_vence_a_modificada_mais_recente(
 
     assert dest.name == STAMP_NEW
     assert [u for u, _ in client.downloads] == [url_r]
-    assert SEP_URL not in client.head_urls  # set/2026 nem foi consultado
+    assert setembro["url"] not in client.head_urls  # set/2026 nem foi consultado
+    assert client.head_urls.count(url_o) >= 1 and client.head_urls.count(url_r) >= 1
+
+
+def _empate(monkeypatch):
+    original = _entry(2026, 10, 100, nome="serie_historica_out26.xlsx")
+    revisada = _entry(2026, 10, 101, nome="serie_historica_out26_revisada.xlsx")
+    monkeypatch.setattr(
+        catalog, "list_datasets", lambda group=None: [original, revisada]
+    )
+    return original["url"], revisada["url"]
+
+
+def test_empate_com_uma_planilha_em_erro_pula_so_essa(tmp_path, monkeypatch, caplog):
+    url_o, url_r = _empate(monkeypatch)
+    client = FakeClient(
+        {RTN_FILE_BASE_URL: _http500, url_o: _http500, url_r: _ok(LM_NEW)}
+    )
+    _usa(monkeypatch, client)
+
+    dest = fetcher.download_latest_file(tmp_path)
+
+    assert dest.name == STAMP_NEW
+    assert [u for u, _ in client.downloads] == [url_r]
+    assert "ignorada" in caplog.text
+
+
+def test_empate_com_todas_as_planilhas_em_erro_o_caminho_falha(tmp_path, monkeypatch):
+    url_o, url_r = _empate(monkeypatch)
+    client = FakeClient({RTN_FILE_BASE_URL: _http500, url_o: _http500, url_r: _timeout})
+    _usa(monkeypatch, client)
+
+    with pytest.raises(FetchError) as info:
+        fetcher.download_latest_file(tmp_path)
+
+    msg = str(info.value)
+    assert "nenhuma planilha da edição mais recente" in msg
+    assert (
+        "serie_historica_out26.xlsx" in msg and "serie_historica_out26_revisada" in msg
+    )
+    assert client.downloads == []
 
 
 # --- CKAN -----------------------------------------------------------------
@@ -377,6 +418,65 @@ def test_ckan_sem_datas_segue_a_ordem_da_fonte_e_registra(caplog):
     url, _, _ = fetcher._resolve_via_ckan(client)
     assert url == a
     assert "ordem da fonte" in caplog.text
+
+
+def _sem_lm(url=CKAN_RES):
+    return DummyResponse(headers={"Content-Type": "application/octet-stream"}, url=url)
+
+
+def test_ckan_datas_com_e_sem_fuso_misturadas_ordenam_em_utc_sem_erro():
+    a, b, c = (f"https://x.gov.br/{n}.xlsx" for n in "abc")
+    # 2026-11-27 23:00 -03:00 == 2026-11-28 02:00 UTC: o mais novo dos três
+    client = FakeClient(
+        {a: _ok(LM_OLD), b: _ok(LM_OLD), c: _ok(LM_NEW)},
+        ckan=_ckan(
+            _res(a, "2026-11-28T01:00:00"),  # sem fuso (vale UTC)
+            _res(b, "2026-11-27T23:00:00-03:00"),  # 02:00 UTC de 28/11
+            _res(c, "2026-11-20T00:00:00+00:00"),
+        ),
+    )
+    url, _, _ = fetcher._resolve_via_ckan(client)
+    assert url == b and client.head_urls == [b]
+
+
+def test_ckan_carimbo_com_offset_vira_utc_sem_fuso():
+    a = "https://x.gov.br/a.xlsx"
+    client = FakeClient(
+        {a: _sem_lm(a)}, ckan=_ckan(_res(a, "2026-11-27T23:00:00-03:00"))
+    )
+    _, mod, _ = fetcher._resolve_via_ckan(client)
+    assert mod == dt.datetime(2026, 11, 28, 2, 0, 0) and mod.tzinfo is None
+
+
+def test_ckan_carimbo_prefere_o_last_modified_http_do_recurso():
+    a = "https://x.gov.br/a.xlsx"
+    client = FakeClient({a: _ok(LM_OLD, a)}, ckan=_ckan(_res(a, "2026-11-27T00:00:00")))
+    _, mod, _ = fetcher._resolve_via_ckan(client)
+    assert mod == dt.datetime(2026, 10, 29, 18, 31, 33)  # o do HTTP, não o do CKAN
+
+
+def test_ckan_nunca_usa_metadata_modified_nem_created_como_carimbo():
+    a, b = "https://x.gov.br/a.xlsx", "https://x.gov.br/b.xlsx"
+    so_metadata = {
+        "name": "RTN - Série Histórica",
+        "format": "XLSX",
+        "url": a,
+        "metadata_modified": "2026-11-28T00:00:00",
+        "created": "2026-11-28T00:00:00",
+    }
+    client = FakeClient(
+        {a: _sem_lm(a), b: _sem_lm(b)},
+        ckan=_ckan(so_metadata, _res(b, "2026-10-01T00:00:00")),
+    )
+    # o primeiro (só metadata_modified) não serve; o segundo tem last_modified
+    url, mod, _ = fetcher._resolve_via_ckan(client)
+    assert url == b and mod == dt.datetime(2026, 10, 1)
+    assert client.head_urls == [a, b]  # a foi tentado primeiro e descartado
+
+    # sem nenhuma data confiável, o caminho inteiro falha
+    sozinho = FakeClient({a: _sem_lm(a)}, ckan=_ckan(so_metadata))
+    with pytest.raises(FetchError, match="sem data confiável"):
+        fetcher._resolve_via_ckan(sozinho)
 
 
 # --- falhas gerais ----------------------------------------------------------
