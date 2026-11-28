@@ -15,6 +15,7 @@ from collections.abc import Callable, Iterable
 from typing import Any
 
 from bs4 import BeautifulSoup
+from quantilica.core.exceptions import FetchError
 from quantilica.core.logging import get_logger
 
 from .constants import (
@@ -207,3 +208,26 @@ def list_datasets(group: str | None = None) -> list[dict[str, Any]]:
     if group is None:
         return list(entries)
     return [e for e in entries if e["group"] == group]
+
+
+def latest_serie_historica_entry() -> dict[str, Any]:
+    """Entrada mais recente da série histórica (grupo ``rtn``) em planilha XLSX.
+
+    A mais recente é a de maior (ano, mês) de publicação. É a planilha que
+    ``read_all_sheets`` sabe ler; entradas de outro formato são ignoradas.
+
+    Raises:
+        FetchError: Se o catálogo não listar nenhuma planilha XLSX da série.
+    """
+    candidates: list[tuple[tuple[int, int], dict[str, Any]]] = []
+    for entry in list_datasets(GROUP_SERIE_HISTORICA):
+        if entry.get("ext") != "xlsx":
+            continue
+        try:
+            key = (int(entry["ano_publicacao"]), int(entry["mes_publicacao"]))
+        except (KeyError, TypeError, ValueError):
+            continue
+        candidates.append((key, entry))
+    if not candidates:
+        raise FetchError("o catálogo não lista nenhuma série histórica em XLSX")
+    return max(candidates, key=lambda item: item[0])[1]

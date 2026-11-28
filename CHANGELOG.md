@@ -5,6 +5,13 @@ Todas as mudanças notáveis deste projeto serão documentadas neste arquivo.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/),
 e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [Não lançado]
+
+### Corrigido
+
+- `download_latest_file`: quando o link curto da fonte falha (erro HTTP, tempo esgotado, página HTML devolvida com status 200 ou arquivo que não é planilha), a função agora usa o mesmo catálogo do `sync` e baixa a planilha mais recente da série histórica (grupo `rtn`, maior ano/mês de publicação, só XLSX). O link continua sendo tentado primeiro; o log diz por que ele foi abandonado e qual caminho baixou o arquivo. O CKAN segue como último recurso, e se nenhum caminho funcionar o erro traz a causa de cada um. Assinatura e retorno não mudam. O corpo baixado precisa ter assinatura de XLSX antes de substituir qualquer arquivo.
+- Antes, sem o link, a função escolhia a primeira edição que respondesse de uma lista fixa de anexos conhecidos (a de setembro/2026, mesmo com a de outubro publicada). Essa lista agora só é usada pelo catálogo quando a API de metadados está fora do ar.
+
 ## [0.7.4] - 2026-11-25
 
 ### Corrigido

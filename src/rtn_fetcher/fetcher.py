@@ -5,7 +5,9 @@ Tesouro Nacional API.
 """
 
 import datetime as dt
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlsplit
 
 from bs4 import BeautifulSoup
@@ -21,12 +23,12 @@ from quantilica.core.storage import stamp_filename
 
 from .constants import (
     HTTP_DATE_FORMAT,
-    KNOWN_SERIE_HISTORICA_ANEXOS,
     RTN_API_BASE_URL,
     RTN_CKAN_PACKAGE_URL,
     RTN_FILE_BASE_URL,
-    RTN_THOT_ARQUIVOS_BASE_URL,
 )
+
+_Resolution = tuple[str, dt.datetime, dict[str, str] | None]
 
 logger = get_logger(__name__)
 _client: HttpClient | None = None
@@ -85,112 +87,153 @@ def generate_filename(modified_date: dt.datetime) -> str:
     return stamp_filename("rtn", "xlsx", modified_date, precision="datetime")
 
 
+_XLSX_FORMAT = "xlsx"
+
+
+def _last_modified_of(head: Any, url: str) -> dt.datetime:
+    """Lê o ``Last-Modified`` de uma resposta de cabeçalho.
+
+    Raises:
+        FetchError: Se a resposta não trouxer o cabeçalho.
+    """
+    header = head.headers.get("Last-Modified")
+    if not header:
+        raise FetchError(f"Resposta de {url} sem Last-Modified")
+    return dt.datetime.strptime(header, HTTP_DATE_FORMAT)
+
+
+def _check_not_html(head: Any, url: str) -> None:
+    """Recusa resposta que se anuncia como página HTML (soft-200 da fonte).
+
+    Raises:
+        FetchError: Se o ``Content-Type`` for HTML ou o status for de erro.
+    """
+    if head.status_code >= 400:
+        raise FetchError(f"{url} respondeu HTTP {head.status_code}")
+    content_type = head.headers.get("Content-Type", "")
+    if "html" in content_type.lower():
+        raise FetchError(
+            f"{url} devolveu uma página HTML (Content-Type {content_type!r}) "
+            "no lugar da planilha"
+        )
+
+
+def _resolve_via_link(client: HttpClient) -> _Resolution:
+    """Resolve pelo link curto da fonte (``RTN_FILE_BASE_URL``)."""
+    head = client.head_or_get(RTN_FILE_BASE_URL, params={"conteudo": "cdn"})
+    _check_not_html(head, RTN_FILE_BASE_URL)
+    return (
+        RTN_FILE_BASE_URL,
+        _last_modified_of(head, RTN_FILE_BASE_URL),
+        {"conteudo": "cdn"},
+    )
+
+
+def _resolve_via_catalog(client: HttpClient) -> _Resolution:
+    """Resolve pelo catálogo, o mesmo que o ``sync`` usa para o grupo ``rtn``.
+
+    Escolhe a planilha mais recente da série histórica listada pelo catálogo
+    (que já cai na lista de anexos conhecidos se a API de metadados estiver
+    fora do ar).
+    """
+    from .catalog import latest_serie_historica_entry
+
+    entry = latest_serie_historica_entry()
+    url = str(entry["url"])
+    head = client.head_or_get(url)
+    _check_not_html(head, url)
+    modified_date = _last_modified_of(head, url)
+    logger.info(
+        "Série histórica do RTN escolhida pelo catálogo: %s (%02d/%d)",
+        entry["filename"],
+        int(entry["mes_publicacao"]),
+        int(entry["ano_publicacao"]),
+    )
+    return url, modified_date, None
+
+
+def _resolve_via_ckan(client: HttpClient) -> _Resolution:
+    """Resolve pelo recurso da série histórica no CKAN (último recurso)."""
+    data = client.get_json(RTN_CKAN_PACKAGE_URL)
+    resources = data.get("result", {}).get("resources", [])
+    for r in resources:
+        r_name = r.get("name", "").lower()
+        r_url = r.get("url", "").lower()
+        is_xlsx = r.get("format", "").upper() == "XLSX"
+        is_serie = any(
+            k in r_name or k in r_url
+            for k in ["serie", "série", "historica", "histórica"]
+        )
+        if not (is_xlsx and is_serie):
+            continue
+        ckan_url = r.get("url")
+        if not ckan_url:
+            continue
+        head = client.head_or_get(ckan_url)
+        _check_not_html(head, ckan_url)
+        if head.headers.get("Last-Modified"):
+            return ckan_url, _last_modified_of(head, ckan_url), None
+        ckan_lm = r.get("last_modified")
+        if ckan_lm:
+            return ckan_url, dt.datetime.fromisoformat(ckan_lm), None
+    raise FetchError("o pacote do CKAN não lista a série histórica em XLSX")
+
+
+# Caminhos para achar a planilha, na ordem em que são tentados.
+_PATHS: tuple[tuple[str, Callable[[HttpClient], _Resolution]], ...] = (
+    ("link curto da fonte", _resolve_via_link),
+    ("catálogo", _resolve_via_catalog),
+    ("CKAN", _resolve_via_ckan),
+)
+
+
+def _describe(exc: BaseException) -> str:
+    return f"{type(exc).__name__}: {exc}"
+
+
+def _fail_all(causes: list[tuple[str, BaseException]]) -> FetchError:
+    detail = "; ".join(f"{label}: {_describe(exc)}" for label, exc in causes)
+    return FetchError(
+        f"Não foi possível obter a Série Histórica do RTN por nenhum caminho "
+        f"({detail})."
+    )
+
+
 def resolve_latest_serie_historica(
     client: HttpClient,
 ) -> tuple[str, dt.datetime, dict[str, str] | None]:
-    """Resolve the URL, Last-Modified date, and request params for latest RTN file.
+    """Resolve a URL, o ``Last-Modified`` e os params da série histórica mais recente.
 
-    Follows a multi-tier fallback strategy:
-    1. Legacy permalink (RTN_FILE_BASE_URL) with short timeout (5s).
-    2. THOT-Arquivos microservice / CDN using known attachments.
-    3. CKAN Open Data API package resource.
+    Tenta, nesta ordem: o link curto da fonte, o catálogo (o mesmo do
+    ``sync``) e o CKAN. Um link que responde erro, página HTML ou sem
+    ``Last-Modified`` é abandonado.
 
     Returns:
         tuple of (download_url, modified_datetime, params_dict).
 
     Raises:
-        ParseError: If unable to determine a valid Last-Modified timestamp.
-        FetchError: If all upstream sources fail.
+        FetchError: Se nenhum caminho resolver (a mensagem traz cada causa).
     """
-    # 1. Tentativa via permalink legado do sisweb
-    try:
-        head = client.head_or_get(
-            RTN_FILE_BASE_URL,
-            params={"conteudo": "cdn"},
-        )
-        if head.status_code < 400:
-            last_modified_header = head.headers.get("Last-Modified")
-            if last_modified_header:
-                modified_date = dt.datetime.strptime(
-                    last_modified_header, HTTP_DATE_FORMAT
-                )
-                return RTN_FILE_BASE_URL, modified_date, {"conteudo": "cdn"}
-    except Exception as exc:
-        logger.warning(
-            "Upstream permalink legado (%s) indisponível: %s. "
-            "Ativando fallback resiliente.",
-            RTN_FILE_BASE_URL,
-            exc,
-        )
-
-    # 2. Resolução via THOT-Arquivos / CDN
-    try:
-        sorted_editions = sorted(KNOWN_SERIE_HISTORICA_ANEXOS.items(), reverse=True)
-        for (ano, mes), meta in sorted_editions:
-            anexo_id = meta["anexo_id"]
-            url = f"{RTN_THOT_ARQUIVOS_BASE_URL}/publicacao-anexo/{anexo_id}"
-            head = client.head_or_get(url)
-            if head.status_code < 400:
-                last_modified_header = head.headers.get("Last-Modified")
-                if last_modified_header:
-                    modified_date = dt.datetime.strptime(
-                        last_modified_header, HTTP_DATE_FORMAT
-                    )
-                    final_url = str(head.url) if head.url else url
-                    logger.info(
-                        "Resolvido arquivo RTN (%02d/%d) via THOT-Arquivos: %s",
-                        mes,
-                        ano,
-                        final_url,
-                    )
-                    return final_url, modified_date, None
-    except Exception as exc:
-        logger.warning(
-            "Resolução via THOT-Arquivos falhou (%s). Tentando CKAN.",
-            exc,
-        )
-
-    # 3. Resolução via CKAN Open Data API
-    try:
-        data = client.get_json(RTN_CKAN_PACKAGE_URL)
-        resources = data.get("result", {}).get("resources", [])
-        for r in resources:
-            r_name = r.get("name", "").lower()
-            r_url = r.get("url", "").lower()
-            is_xlsx = r.get("format", "").upper() == "XLSX"
-            is_serie = any(
-                k in r_name or k in r_url
-                for k in ["serie", "série", "historica", "histórica"]
-            )
-            if is_xlsx and is_serie:
-                ckan_url = r.get("url")
-                if ckan_url:
-                    head = client.head_or_get(ckan_url)
-                    last_modified_header = head.headers.get("Last-Modified")
-                    if last_modified_header:
-                        modified_date = dt.datetime.strptime(
-                            last_modified_header, HTTP_DATE_FORMAT
-                        )
-                        logger.info("Resolvido arquivo RTN via CKAN: %s", ckan_url)
-                        return ckan_url, modified_date, None
-                    ckan_lm = r.get("last_modified")
-                    if ckan_lm:
-                        modified_date = dt.datetime.fromisoformat(ckan_lm)
-                        logger.info(
-                            "Resolvido arquivo RTN via CKAN (meta): %s", ckan_url
-                        )
-                        return ckan_url, modified_date, None
-    except Exception as exc:
-        logger.warning("Resolução via CKAN falhou: %s", exc)
-
-    raise FetchError(
-        "Não foi possível resolver a Série Histórica do RTN: todos os endpoints "
-        "(sisweb, thot-arquivos e CKAN) falharam ou estão indisponíveis."
-    )
+    causes: list[tuple[str, BaseException]] = []
+    for label, resolve in _PATHS:
+        try:
+            resolution = resolve(client)
+        except Exception as exc:  # noqa: BLE001 - cai para o próximo caminho
+            logger.warning("Caminho '%s' indisponível: %s", label, _describe(exc))
+            causes.append((label, exc))
+            continue
+        logger.info("Série histórica do RTN resolvida pelo caminho '%s'", label)
+        return resolution
+    raise _fail_all(causes) from (causes[-1][1] if causes else None)
 
 
 def download_latest_file(destination_dir: Path) -> Path:
     """Download the latest RTN historical series Excel file.
+
+    Tenta primeiro o link curto da fonte; se ele falhar (erro HTTP, tempo
+    esgotado, página HTML ou arquivo que não é planilha), usa o catálogo (o
+    mesmo do ``sync``) e escolhe a série histórica mais recente. O CKAN é o
+    último recurso.
 
     The filename embeds the remote ``Last-Modified`` timestamp, so each new
     upstream version produces a distinct local file. Returns the local path;
@@ -203,28 +246,51 @@ def download_latest_file(destination_dir: Path) -> Path:
         Path to the downloaded or existing local file.
 
     Raises:
-        ParseError: If the server response lacks a Last-Modified header or it's invalid.
-        FetchError: If all upstream sources are unavailable.
+        FetchError: If every path fails; the message lists each cause.
     """
     client = _get_client()
+    causes: list[tuple[str, BaseException]] = []
 
     with log_step(logger, "download-rtn-file"):
-        url, modified_date, params = resolve_latest_serie_historica(client)
-        filename = generate_filename(modified_date)
-        destination_path = Path(destination_dir) / filename
+        for label, resolve in _PATHS:
+            try:
+                url, modified_date, params = resolve(client)
+                filename = generate_filename(modified_date)
+                destination_path = Path(destination_dir) / filename
 
-        if is_complete_file(destination_path):
-            logger.info(f"File {filename} already exists, skipping download.")
-            return destination_path
+                if is_complete_file(destination_path):
+                    logger.info(f"File {filename} already exists, skipping download.")
+                    return destination_path
 
-        return client.download_with_manifest(
-            url,
-            destination_path,
-            source_id=SOURCE_ID,
-            dataset_id=DATASET_ID,
-            producer="rtn-fetcher",
-            params=params,
-        )
+                path = client.download_with_manifest(
+                    url,
+                    destination_path,
+                    source_id=SOURCE_ID,
+                    dataset_id=DATASET_ID,
+                    producer="rtn-fetcher",
+                    params=params,
+                    expected_format=_XLSX_FORMAT,
+                )
+            except Exception as exc:  # noqa: BLE001 - cai para o próximo caminho
+                logger.warning(
+                    "Caminho '%s' falhou, tentando o próximo: %s",
+                    label,
+                    _describe(exc),
+                )
+                causes.append((label, exc))
+                continue
+            if causes:
+                logger.info(
+                    "Série histórica do RTN baixada pelo caminho '%s' "
+                    "(abandonado antes: %s)",
+                    label,
+                    "; ".join(f"{lb}: {_describe(e)}" for lb, e in causes),
+                )
+            else:
+                logger.info("Série histórica do RTN baixada pelo caminho '%s'", label)
+            return path
+
+    raise _fail_all(causes) from (causes[-1][1] if causes else None)
 
 
 def is_pdf_body(content: bytes) -> bool:
