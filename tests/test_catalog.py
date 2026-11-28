@@ -66,6 +66,12 @@ def _ids(entries):
         ("serie_historica_ago26.xlsx", "rtn"),
         ("serie_historica_jan21_nova estrutura.xlsx", "rtn"),
         ("Série Histórica jan21.CSV", "rtn"),
+        ("serie-historica-out26.xlsx", "rtn"),
+        ("Serie-Historica out26.XLSX", "rtn"),
+        ("SERIE_HISTORICA_OUT26.xlsx", "rtn"),
+        ("serie historica_out26.xlsx", "rtn"),
+        ("serie-historica-out26.pdf", "rtn-publicacoes"),
+        ("Tabela-Série-Histórica.xls", "rtn-anexos"),
         ("Anexos RTN mar_2015.xlsx", "rtn-anexos"),
         ("Tabela1 - Série Histórica.xls", "rtn-anexos"),
         ("RTN_ago26.pdf", "rtn-publicacoes"),
@@ -145,3 +151,37 @@ def test_sync_dry_run_sem_grupo_nao_lista_pdf_nem_gif(fake_page):
     result = CliRunner().invoke(app, ["sync", "todos", "--dry-run"])
     assert result.exit_code == 0, result.output
     assert "9 arquivo(s) listado(s)" in result.output
+
+
+_SEM_CARDS = "<html><body><div class='cartao-novo'>layout novo</div></body></html>"
+_CARDS_SEM_LINKS = (
+    '<div class="card-rtn" data-id-publicacao="1" data-nr-ano="2026" '
+    'data-id-periodicidade-periodo="8"><h3>RTN</h3><p>x</p></div>'
+)
+
+
+def test_extract_pagina_sem_card_levanta():
+    from bs4 import BeautifulSoup
+    from quantilica.core.exceptions import ParseError
+
+    from rtn_fetcher.extract import extract_publication_metadata
+
+    with pytest.raises(ParseError, match="card-rtn"):
+        extract_publication_metadata(BeautifulSoup(_SEM_CARDS, "html.parser"))
+
+
+@pytest.mark.parametrize("html", [_SEM_CARDS, _CARDS_SEM_LINKS, ""])
+def test_pagina_irreconhecivel_nao_vira_catalogo_vazio_em_cache(
+    monkeypatch, caplog, html
+):
+    monkeypatch.setattr(catalog, "fetch_publications_metadata", lambda: html)
+    catalog.clear_cache()
+    try:
+        with caplog.at_level("WARNING"):
+            entradas = catalog.list_datasets("rtn")
+        # A reserva age (lista fixa, marcada como sintética) e o motivo vai ao log.
+        assert entradas and all(e["synthetic"] is True for e in entradas)
+        assert any("catálogo resiliente" in r.message for r in caplog.records)
+        assert catalog._cache is not None and catalog._cache[1]
+    finally:
+        catalog.clear_cache()

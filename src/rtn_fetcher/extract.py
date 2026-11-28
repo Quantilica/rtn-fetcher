@@ -8,6 +8,7 @@ import re
 from typing import Any
 
 from bs4 import BeautifulSoup
+from quantilica.core.exceptions import ParseError
 
 from .account import (
     clean_account_name,
@@ -60,9 +61,19 @@ def extract_publication_metadata(soup: BeautifulSoup) -> list[dict[str, Any]]:
         - titulo: Publication title
         - resumo: Publication summary/description
         - links: Dict mapping link text to URLs
+
+    Raises:
+        ParseError: Se a página não tem nenhum ``div.card-rtn`` (layout da fonte
+            mudou, ou a resposta não é a página de publicações). Lista vazia nunca
+            é devolvida: seria confundida com "a fonte não publicou nada".
     """
     publications = []
     cards = soup.select("div.card-rtn")
+    if not cards:
+        raise ParseError(
+            "página de publicações do RTN sem nenhum card reconhecido "
+            "(seletor 'div.card-rtn'): o layout da fonte pode ter mudado"
+        )
 
     for card in cards:
         publication_id = card.get("data-id-publicacao", "")

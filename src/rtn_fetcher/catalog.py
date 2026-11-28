@@ -9,13 +9,14 @@ pedido explícito (``rtn-anexos``, ``rtn-publicacoes`` ou os aliases
 ``planilhas``/``todos``).
 """
 
+import re
 import time
 import unicodedata
 from collections.abc import Callable, Iterable
 from typing import Any
 
 from bs4 import BeautifulSoup
-from quantilica.core.exceptions import FetchError
+from quantilica.core.exceptions import FetchError, ParseError
 from quantilica.core.logging import get_logger
 
 from .constants import (
@@ -74,6 +75,9 @@ def _normalize(text: str) -> str:
     return "".join(c for c in decomposed if not unicodedata.combining(c)).lower()
 
 
+_SERIE_HISTORICA = re.compile(r"serie[\s_-]*historica")
+
+
 def file_extension(filename: str) -> str:
     """Extensão do arquivo em minúsculas, ou ``""`` para links sem extensão."""
     base = filename.rsplit("/", 1)[-1]
@@ -96,8 +100,10 @@ def classify_entry(filename: str) -> str:
     ext = file_extension(filename)
     if ext not in DATA_EXTENSIONS:
         return GROUP_PUBLICACOES
-    nome = _normalize(filename).replace(" ", "_")
-    if nome.startswith("serie_historica"):
+    # "serie_historica_...", "serie-historica-...", "Série Histórica ...": o
+    # separador entre as duas palavras pode ser "_", "-" ou espaço, em qualquer caixa.
+    nome = _normalize(filename).strip()
+    if _SERIE_HISTORICA.match(nome):
         return GROUP_SERIE_HISTORICA
     return GROUP_ANEXOS
 
@@ -148,24 +154,7 @@ def _fallback_entries() -> list[dict[str, Any]]:
     return entries
 
 
-def _all_entries() -> list[dict[str, Any]]:
-    global _cache
-    now = time.monotonic()
-    if _cache is not None and now - _cache[0] < _CACHE_TTL_SECONDS:
-        return _cache[1]
-
-    try:
-        html = fetch_publications_metadata()
-        soup = BeautifulSoup(html, "html.parser")
-        pubs = extract_publication_metadata(soup)
-    except Exception as exc:
-        logger.warning(
-            "API de metadados APEX indisponível (%s). Usando catálogo resiliente.", exc
-        )
-        entries = _fallback_entries()
-        _cache = (now, entries)
-        return entries
-
+def _entries_from_publications(pubs: list[dict[str, Any]]) -> list[dict[str, Any]]:
     entries = []
     for pub in pubs:
         ano = pub.get("ano_publicacao")
@@ -182,6 +171,33 @@ def _all_entries() -> list[dict[str, Any]]:
                     "ext": file_extension(filename) or "html",
                 }
             )
+    return entries
+
+
+def _all_entries() -> list[dict[str, Any]]:
+    global _cache
+    now = time.monotonic()
+    if _cache is not None and now - _cache[0] < _CACHE_TTL_SECONDS:
+        return _cache[1]
+
+    try:
+        html = fetch_publications_metadata()
+        soup = BeautifulSoup(html, "html.parser")
+        pubs = extract_publication_metadata(soup)
+        entries = _entries_from_publications(pubs)
+        if not entries:
+            # Cards sem nenhum link: catálogo vazio não é "a fonte não publicou".
+            raise ParseError("página de publicações do RTN sem nenhum arquivo listado")
+    except Exception as exc:
+        logger.warning(
+            "API de metadados APEX indisponível ou página irreconhecível (%s). "
+            "Usando catálogo resiliente.",
+            exc,
+        )
+        entries = _fallback_entries()
+        _cache = (now, entries)
+        return entries
+
     _cache = (now, entries)
     return entries
 

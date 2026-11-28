@@ -5,6 +5,13 @@ Todas as mudanças notáveis deste projeto serão documentadas neste arquivo.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/),
 e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [Não lançado]
+
+### Corrigido
+
+- Página de publicações sem nenhum card reconhecido (`div.card-rtn`) passa a ser erro (`ParseError` em `extract_publication_metadata`), em vez de lista vazia. Antes, se o HTML da fonte mudasse, não havia exceção, a reserva do catálogo não agia, a lista vazia ficava no cache e o `sync` saía 0 sem baixar nada. Agora o catálogo cai na lista fixa (entradas `synthetic`) com um WARNING que diz o motivo; o mesmo vale para uma página com cards mas sem nenhum arquivo listado. O catálogo vazio nunca vai para o cache.
+- `classify_entry` reconhece a série histórica com `-`, espaço ou `_` entre as palavras, sem diferenciar maiúsculas (ex.: `serie-historica-out26.xlsx`). Antes só o `_` (ou espaço, depois do acento) servia, e um nome com hífen saía do grupo padrão `rtn` e caía em `rtn-anexos`, onde `sync` sem grupo não o baixava.
+
 ## [0.7.5] - 2026-11-28
 
 ### Corrigido
