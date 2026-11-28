@@ -8,6 +8,7 @@ from typing import Any, cast
 from urllib.parse import urlsplit
 
 from quantilica.cli.sdk import CheckPlanItem, FetcherApp
+from quantilica.core.exceptions import FetchError
 from quantilica.core.http import HttpClient
 from quantilica.core.logging import get_logger
 from quantilica.core.registry import FetcherInfo
@@ -24,6 +25,11 @@ from .storage import DataRepository
 
 logger = get_logger(__name__)
 
+try:  # constante do host (cli >= 0.30.1); reserva local para hosts mais antigos
+    from quantilica.cli.sdk import LISTING_ERROR_REASON
+except ImportError:  # pragma: no cover
+    LISTING_ERROR_REASON = "listing-error"
+
 
 def path_builder(
     output_dir: Path, entry: dict[str, Any], last_modified: dt.date | None
@@ -39,6 +45,14 @@ def path_builder(
         The destination path.
     """
     return DataRepository(output_dir).path_for_entry(entry, last_modified=last_modified)
+
+
+def _listing_error_message(entry: dict[str, Any]) -> str:
+    return (
+        "catálogo do RTN indisponível ou irreconhecível "
+        f"({entry.get('error_class')}: {entry.get('error')}); a lista fixa de "
+        "anexos conhecidos pode estar atrasada em relação à fonte"
+    )
 
 
 class RtnFetcherApp(FetcherApp):
@@ -68,7 +82,13 @@ class RtnFetcherApp(FetcherApp):
         dry_run: bool = False,
         **kwargs: Any,
     ) -> Path:
-        """Baixa a entrada; para PDF, resolve o visualizador antes."""
+        """Baixa a entrada; para PDF, resolve o visualizador antes.
+
+        A sentinela de falha de descoberta do catálogo não é arquivo: levanta
+        ``FetchError`` (erro contado no ``sync``, que sai 3 se algo baixou, ou 1).
+        """
+        if entry.get("listing_error"):
+            raise FetchError(_listing_error_message(entry))
         if not dry_run:
             entry = self._resolve_pdf_entry(entry)
         return super().download_entry(entry, output_dir, dry_run=dry_run, **kwargs)
@@ -77,8 +97,25 @@ class RtnFetcherApp(FetcherApp):
         """Confere a entrada; para PDF, confere o arquivo real.
 
         Se o visualizador não puder ser resolvido, cai na checagem padrão da
-        página (o download recusará o corpo inválido).
+        página (o download recusará o corpo inválido). A sentinela de falha de
+        descoberta do catálogo vira ``skip-unavailable``/``listing-error``, que o
+        host conta como erro no ``sync --from-plan``.
         """
+        if entry.get("listing_error"):
+            return CheckPlanItem(
+                dataset=str(entry.get("group") or "rtn"),
+                id=str(entry.get("id", "unknown")),
+                url=str(entry.get("url", "")),
+                partition=None,
+                local_path="",
+                remote_etag=None,
+                remote_last_modified=None,
+                remote_size=None,
+                local_exists=False,
+                action="skip-unavailable",
+                reason=LISTING_ERROR_REASON,
+                entry=dict(entry),
+            )
         try:
             entry = self._resolve_pdf_entry(entry)
         except Exception as exc:  # noqa: BLE001 - checagem é best effort

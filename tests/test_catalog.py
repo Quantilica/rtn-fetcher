@@ -171,7 +171,7 @@ def test_extract_pagina_sem_card_levanta():
 
 
 @pytest.mark.parametrize("html", [_SEM_CARDS, _CARDS_SEM_LINKS, ""])
-def test_pagina_irreconhecivel_nao_vira_catalogo_vazio_em_cache(
+def test_pagina_irreconhecivel_cai_na_reserva_com_sentinela_de_erro(
     monkeypatch, caplog, html
 ):
     monkeypatch.setattr(catalog, "fetch_publications_metadata", lambda: html)
@@ -180,8 +180,31 @@ def test_pagina_irreconhecivel_nao_vira_catalogo_vazio_em_cache(
         with caplog.at_level("WARNING"):
             entradas = catalog.list_datasets("rtn")
         # A reserva age (lista fixa, marcada como sintética) e o motivo vai ao log.
-        assert entradas and all(e["synthetic"] is True for e in entradas)
+        reserva = [e for e in entradas if not e.get("listing_error")]
+        assert reserva and all(e["synthetic"] is True for e in reserva)
         assert any("catálogo resiliente" in r.message for r in caplog.records)
+        # E a falha não some: uma sentinela carrega a causa para o check e o sync.
+        (sentinela,) = [e for e in entradas if e.get("listing_error")]
+        assert sentinela["id"] == catalog.LISTING_ERROR_ID
+        assert sentinela["error_class"] == "ParseError"
+        assert sentinela["error"]
         assert catalog._cache is not None and catalog._cache[1]
+    finally:
+        catalog.clear_cache()
+
+
+def test_sentinela_nao_conta_como_serie_historica_do_download_mais_recente(
+    monkeypatch,
+):
+    from quantilica.core.exceptions import FetchError
+
+    def fora():
+        raise RuntimeError("HTTP 503")
+
+    monkeypatch.setattr(catalog, "fetch_publications_metadata", fora)
+    catalog.clear_cache()
+    try:
+        with pytest.raises(FetchError, match="catálogo real está indisponível"):
+            catalog.latest_serie_historica_entries()
     finally:
         catalog.clear_cache()

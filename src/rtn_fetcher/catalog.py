@@ -21,6 +21,7 @@ from quantilica.core.logging import get_logger
 
 from .constants import (
     KNOWN_SERIE_HISTORICA_ANEXOS,
+    RTN_API_BASE_URL,
     RTN_THOT_ARQUIVOS_BASE_URL,
 )
 from .extract import extract_publication_metadata
@@ -124,6 +125,30 @@ def resolve_groups_with_default(
     return resolve_default
 
 
+LISTING_ERROR_ID = "rtn-catalogo"
+
+
+def _listing_error_entry(exc: BaseException) -> dict[str, Any]:
+    """Entrada sentinela da falha de descoberta do catálogo.
+
+    O ``check`` a devolve como ``skip-unavailable``/``listing-error`` e o ``download``
+    dela levanta ``FetchError``: sem ela, a reserva fixa faria a falha sumir (o
+    catálogo nunca sai vazio) e a edição nova da fonte passaria despercebida.
+    """
+    return {
+        "group": GROUP_SERIE_HISTORICA,
+        "id": LISTING_ERROR_ID,
+        "url": RTN_API_BASE_URL,
+        "filename": LISTING_ERROR_ID,
+        "ext": "html",
+        "ano_publicacao": None,
+        "mes_publicacao": None,
+        "listing_error": True,
+        "error": str(exc),
+        "error_class": type(exc).__name__,
+    }
+
+
 def _fallback_entries() -> list[dict[str, Any]]:
     """Gera entradas sintéticas para a série histórica a partir dos anexos conhecidos.
 
@@ -194,7 +219,10 @@ def _all_entries() -> list[dict[str, Any]]:
             "Usando catálogo resiliente.",
             exc,
         )
-        entries = _fallback_entries()
+        # Reserva (lista fixa, possivelmente atrasada) + sentinela da falha: a
+        # reserva mantém o ``sync`` baixando o que já se conhece, e a sentinela faz
+        # a falha de descoberta aparecer no ``check`` e no código de saída.
+        entries = [*_fallback_entries(), _listing_error_entry(exc)]
         _cache = (now, entries)
         return entries
 
@@ -250,6 +278,8 @@ def latest_serie_historica_entries() -> list[dict[str, Any]]:
     candidates: list[tuple[tuple[int, int], dict[str, Any]]] = []
     synthetic = 0
     for entry in list_datasets(GROUP_SERIE_HISTORICA):
+        if entry.get("listing_error"):
+            continue  # sentinela da falha de descoberta: não é arquivo
         if entry.get("ext") != "xlsx":
             continue
         if entry.get("synthetic"):

@@ -250,7 +250,7 @@ def test_fallback_do_catalogo_marca_entradas_sinteticas(monkeypatch):
         raise RuntimeError("HTTP 503 APEX down")
 
     monkeypatch.setattr(catalog, "fetch_publications_metadata", api_fora)
-    entradas = catalog.list_datasets("rtn")
+    entradas = [e for e in catalog.list_datasets("rtn") if not e.get("listing_error")]
     assert entradas and all(e["synthetic"] is True for e in entradas)
     with pytest.raises(FetchError, match="catálogo real está indisponível"):
         catalog.latest_serie_historica_entries()
@@ -600,7 +600,9 @@ def test_catalog_fallback_when_apex_fails(monkeypatch: pytest.MonkeyPatch):
 
     monkeypatch.setattr(catalog, "fetch_publications_metadata", fake_failing_fetch)
 
-    entries = catalog.list_datasets("rtn")
+    todas = catalog.list_datasets("rtn")
+    entries = [e for e in todas if not e.get("listing_error")]
+    assert len(todas) == len(entries) + 1  # a sentinela da falha de descoberta
     assert len(entries) == len(KNOWN_SERIE_HISTORICA_ANEXOS)
     filenames = [e["filename"] for e in entries]
     assert "serie_historica_set26.xlsx" in filenames
